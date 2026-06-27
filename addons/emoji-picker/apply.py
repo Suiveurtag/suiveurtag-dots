@@ -14,10 +14,17 @@ from pathlib import Path
 
 
 HOME = Path.home()
-ADDON_DIR = HOME / ".local/share/quickshell-addons/emoji-picker"
-QS_DIR = HOME / ".config/hypr/scripts/quickshell"
+HYPR_BASE = Path(
+    os.environ.get("HYPR_CONFIG_DIR", f"{os.environ.get('XDG_CONFIG_HOME', str(HOME / '.config'))}/hypr")
+).expanduser()
+ADDON_DIR = Path(
+    os.environ.get("XDG_DATA_HOME", str(HOME / ".local/share"))
+).expanduser() / "quickshell-addons/emoji-picker"
+QS_DIR = Path(
+    os.environ.get("HYPR_QUICKSHELL_DIR", HYPR_BASE / "scripts/quickshell")
+).expanduser()
 REGISTRY = QS_DIR / "WindowRegistry.js"
-SETTINGS = HOME / ".config/hypr/settings.json"
+SETTINGS = Path(os.environ.get("HYPR_SETTINGS", HYPR_BASE / "settings.json")).expanduser()
 INSTALL_DIR = QS_DIR / "emoji"
 BACKUP_DIR = ADDON_DIR / "backups"
 
@@ -38,6 +45,9 @@ KEYBIND = {
     "command": "~/.config/hypr/scripts/qs_manager.sh toggle emoji",
     "isEditing": False,
 }
+
+KEYBINDS_CONF = HYPR_BASE / "config" / "keybindings.conf"
+SETTINGS_WATCHER = HYPR_BASE / "scripts" / "settings_watcher.sh"
 
 
 class PatchError(RuntimeError):
@@ -139,6 +149,32 @@ def install_assets() -> bool:
     return changed
 
 
+def keybind_present_in_settings(data: dict) -> bool:
+    for item in data.get("keybinds", []):
+        if isinstance(item, dict) and item.get("command") == KEYBIND["command"]:
+            return True
+    return False
+
+
+def keybind_present_in_conf() -> bool:
+    if not KEYBINDS_CONF.is_file():
+        return False
+    return KEYBIND["command"] in KEYBINDS_CONF.read_text(encoding="utf-8")
+
+
+def compile_hypr_keybinds() -> None:
+    if not SETTINGS_WATCHER.is_file():
+        raise PatchError(f"settings_watcher not found: {SETTINGS_WATCHER}")
+    result = subprocess.run(
+        ["bash", str(SETTINGS_WATCHER), "--compile"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode:
+        details = (result.stdout + result.stderr).strip()
+        raise PatchError(f"settings_watcher --compile failed:\n{details}")
+
+
 def main() -> int:
     if not REGISTRY.is_file() or not SETTINGS.is_file():
         raise PatchError("active Hyprland/Quickshell configuration not found")
@@ -163,11 +199,20 @@ def main() -> int:
         backup(SETTINGS)
         atomic_write(SETTINGS, json.dumps(settings_data, ensure_ascii=False, indent=2) + "\n")
 
+    keybinds_compiled = False
+    if keybind_present_in_settings(settings_data) and (
+        settings_changed or not keybind_present_in_conf()
+    ):
+        compile_hypr_keybinds()
+        keybinds_compiled = True
+
     status = []
     if registry_patched != registry_original:
         status.append("layout")
     if settings_changed:
         status.append("keybind")
+    elif keybinds_compiled:
+        status.append("keybinds compiled")
     if assets_changed:
         status.append("assets")
     print("emoji-picker: updated " + ", ".join(status) if status else "emoji-picker: addon already installed")

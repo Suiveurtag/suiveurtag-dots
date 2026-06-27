@@ -13,13 +13,18 @@ from pathlib import Path
 
 
 HOME = Path.home()
+HYPR_BASE = Path(
+    os.environ.get("HYPR_CONFIG_DIR", f"{os.environ.get('XDG_CONFIG_HOME', str(HOME / '.config'))}/hypr")
+).expanduser()
 PICKER = Path(
     os.environ.get(
         "WALLPAPER_RANDOM_PICKER",
-        HOME / ".config/hypr/scripts/quickshell/wallpaper/WallpaperPicker.qml",
+        HYPR_BASE / "scripts/quickshell/wallpaper/WallpaperPicker.qml",
     )
 ).expanduser()
-ADDON_DIR = HOME / ".local/share/quickshell-addons/wallpaper-random"
+ADDON_DIR = Path(
+    os.environ.get("XDG_DATA_HOME", str(HOME / ".local/share"))
+).expanduser() / "quickshell-addons/wallpaper-random"
 BACKUP_DIR = ADDON_DIR / "backups"
 INSTALL_DIR = PICKER.parent
 
