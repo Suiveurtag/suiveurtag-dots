@@ -13,6 +13,8 @@ This repo currently contains:
 - `music-preview-rounded`: rounded album artwork and an optional CAVA visualizer in the Quickshell top bar
 - `launcher-web-search`: press `Tab` in the app launcher to search the typed text with Zen
 - `headset-mic-loopback`: expose the current headset output as a selectable virtual microphone
+- `captive-portal`: detects Wi-Fi networks that still need a browser login and adds an "Open Login Page" action to the network popup
+- `speedtest`: native network-panel speedtest with a separate button, live progress UI, and Cloudflare endpoint measurements
 
 These addons are designed to stay isolated from the upstream dots:
 
@@ -39,8 +41,8 @@ What it does:
 - copies all addons into `~/.local/share/quickshell-addons`
 - copies the user systemd units into `~/.config/systemd/user`
 - enables and starts the watcher path units
-- runs all patchers immediately
 - preserves current-wallpaper detection for filenames containing spaces
+- runs each patcher immediately
 - reloads Hyprland so the generated keybind file is refreshed
 
 ## Notes
@@ -61,4 +63,6 @@ What it does:
 - The zoom uses Hyprland's native compositor magnifier, with anti-aliasing enabled and a 120 fps eased transition. The drawing overlay requires the commands `grim`, `qs`, and `qmllint` (already present in ilyamiro's dots setup).
 - Installation refreshes the running Quickshell instance so newly added ZoomIt shortcuts appear in **Settings → Keybinds** immediately.
 - Custom ZoomIt key combinations selected in **Settings → Keybinds** are preserved by the addon watcher; defaults are only recreated when an addon entry is missing.
+- The captive portal addon uses `nmcli` for connectivity state and `curl` to discover the login redirect URL when a hotspot requires web authentication.
+- The speedtest addon uses `curl` against Cloudflare's `speed.cloudflare.com` download/upload endpoints and shows live download/upload progress, latency, and final results in its own Matugen-styled network panel view.
 - If you pull new upstream dots later, the path units should reapply the addons automatically.

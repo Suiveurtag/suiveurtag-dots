@@ -122,6 +122,27 @@ run_apply() {
     "$@"
 }
 
+repair_wallpaper_backend() {
+    local backend
+    if command -v awww >/dev/null 2>&1 && ! command -v swww >/dev/null 2>&1; then
+        backend="awww"
+    else
+        return 0
+    fi
+
+    local file
+    for file in \
+        "$HYPR_BASE/scripts/qs_manager.sh" \
+        "$QUICKSHELL_DIR/Config.qml" \
+        "$QUICKSHELL_DIR/wallpaper/WallpaperPicker.qml"; do
+        [[ -f "$file" ]] || continue
+        sed -i \
+            -e 's/swww-daemon/awww-daemon/g' \
+            -e 's/\<swww\>/awww/g' \
+            "$file"
+    done
+}
+
 install_addon "wallpaper-random"
 install_addon "emoji-picker"
 install_addon "matugen-vibrant"
@@ -274,6 +295,7 @@ reload_quickshell_settings() {
 }
 
 if ! is_stub_hypr_config; then
+    repair_wallpaper_backend
     compile_hypr_keybinds
     reload_quickshell_settings
 fi

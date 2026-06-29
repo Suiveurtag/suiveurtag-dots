@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch the upstream Quickshell network popup for the native speedtest addon
+
+[Path]
+PathChanged=%h/.config/hypr/scripts/quickshell/network/NetworkPopup.qml
+Unit=speedtest-addon.service
+
+[Install]
+WantedBy=default.target
