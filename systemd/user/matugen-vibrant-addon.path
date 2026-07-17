@@ -1,0 +1,12 @@
+[Unit]
+Description=Watch the upstream files extended by the vibrant Matugen colors addon
+
+[Path]
+PathChanged=%h/.config/hypr/scripts/quickshell/settings/SettingsPopup.qml
+PathChanged=%h/.config/hypr/settings.json
+PathChanged=%h/.config/matugen/config.toml
+PathChanged=%h/.config/matugen/templates/qs_colors.json.template
+Unit=matugen-vibrant-addon.service
+
+[Install]
+WantedBy=default.target

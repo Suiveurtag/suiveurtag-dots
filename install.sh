@@ -8,6 +8,8 @@ SYSTEMD_SRC="$REPO_DIR/systemd/user"
 ADDONS_DST="${XDG_DATA_HOME:-$HOME/.local/share}/quickshell-addons"
 SYSTEMD_DST="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 HYPR_BASE="${HYPR_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/hypr}"
+MATUGEN_BASE="${MATUGEN_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/matugen}"
+CACHE_BASE="${XDG_CACHE_HOME:-$HOME/.cache}"
 
 warn() {
     echo "warning: $*" >&2
@@ -42,6 +44,11 @@ WALLPAPER_PICKER="$QUICKSHELL_DIR/wallpaper/WallpaperPicker.qml"
 QS_MANAGER="$HYPR_BASE/scripts/qs_manager.sh"
 WINDOW_REGISTRY="$QUICKSHELL_DIR/WindowRegistry.js"
 HYPR_SETTINGS="${HYPR_SETTINGS:-$HYPR_BASE/settings.json}"
+MATUGEN_SETTINGS_POPUP="$QUICKSHELL_DIR/settings/SettingsPopup.qml"
+MATUGEN_CONFIG="${MATUGEN_CONFIG:-$MATUGEN_BASE/config.toml}"
+MATUGEN_QS_TEMPLATE="${MATUGEN_QS_TEMPLATE:-$MATUGEN_BASE/templates/qs_colors.json.template}"
+MATUGEN_RELOAD_SCRIPT="$QUICKSHELL_DIR/wallpaper/matugen_reload.sh"
+MATUGEN_WALLPAPER_CACHE="${MATUGEN_WALLPAPER_CACHE:-$CACHE_BASE/quickshell/wallpaper_picker/current_wallpaper.png}"
 
 install_addon() {
     local name="$1"
@@ -67,6 +74,7 @@ install_systemd_units() {
         sed \
             -e "s#%h/.local/share/quickshell-addons#${ADDONS_DST}#g" \
             -e "s#%h/.config/hypr#${HYPR_BASE}#g" \
+            -e "s#%h/.config/matugen#${MATUGEN_BASE}#g" \
             "$unit" > "$SYSTEMD_DST/$(basename "$unit")"
     done
 }
@@ -85,6 +93,12 @@ run_apply() {
     HYPR_CONFIG_DIR="$HYPR_BASE" \
     HYPR_QUICKSHELL_DIR="$QUICKSHELL_DIR" \
     HYPR_SETTINGS="$HYPR_SETTINGS" \
+    MATUGEN_CONFIG_DIR="$MATUGEN_BASE" \
+    MATUGEN_CONFIG="$MATUGEN_CONFIG" \
+    MATUGEN_QS_TEMPLATE="$MATUGEN_QS_TEMPLATE" \
+    MATUGEN_SETTINGS_POPUP="$MATUGEN_SETTINGS_POPUP" \
+    MATUGEN_RELOAD_SCRIPT="$MATUGEN_RELOAD_SCRIPT" \
+    MATUGEN_WALLPAPER_CACHE="$MATUGEN_WALLPAPER_CACHE" \
     WALLPAPER_RANDOM_PICKER="$WALLPAPER_PICKER" \
     WALLPAPER_RANDOM_MANAGER="$QS_MANAGER" \
     "$@"
@@ -92,18 +106,19 @@ run_apply() {
 
 install_addon "wallpaper-random"
 install_addon "emoji-picker"
+install_addon "matugen-vibrant"
 install_systemd_units
 
 if user_systemctl daemon-reload; then
-    if ! user_systemctl enable --now wallpaper-random-addon.path emoji-picker-addon.path; then
+    if ! user_systemctl enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path; then
         warn "could not enable addon watcher units"
-        echo "  run: systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path" >&2
+        echo "  run: systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path" >&2
     fi
 else
     warn "user systemd session is not available; units were installed but not enabled"
     echo "  after logging into a graphical session, run:" >&2
     echo "    systemctl --user daemon-reload" >&2
-    echo "    systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path" >&2
+    echo "    systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path" >&2
 fi
 
 patch_failures=0
@@ -136,6 +151,17 @@ else
         echo "  install the Hyprland/Quickshell dots first; the watcher will apply this addon later" >&2
         patch_failures=$((patch_failures + 1))
     fi
+
+    if [[ -f "$MATUGEN_SETTINGS_POPUP" && -f "$MATUGEN_CONFIG" && -f "$MATUGEN_QS_TEMPLATE" ]]; then
+        if ! run_apply MATUGEN_VIBRANT_APPLY_DELAY=0 "$ADDONS_DST/matugen-vibrant/apply.sh"; then
+            warn "matugen-vibrant patch failed"
+            patch_failures=$((patch_failures + 1))
+        fi
+    else
+        warn "upstream Matugen settings files not found (expected $MATUGEN_SETTINGS_POPUP, $MATUGEN_CONFIG and $MATUGEN_QS_TEMPLATE)"
+        echo "  install the Hyprland/Quickshell dots first; the watcher will apply this addon later" >&2
+        patch_failures=$((patch_failures + 1))
+    fi
 fi
 
 compile_hypr_keybinds() {
@@ -156,4 +182,4 @@ if (( patch_failures > 0 )); then
     exit 0
 fi
 
-echo "Installed wallpaper-random and emoji-picker addons."
+echo "Installed wallpaper-random, emoji-picker and matugen-vibrant addons."
