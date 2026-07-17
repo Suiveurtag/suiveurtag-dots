@@ -54,6 +54,7 @@ RELOAD_SCRIPT = Path(
         QS_DIR / "wallpaper/matugen_reload.sh",
     )
 ).expanduser()
+SHELL_QML = Path(os.environ.get("MATUGEN_SHELL_QML", QS_DIR / "Shell.qml")).expanduser()
 ADDON_DIR = Path(
     os.environ.get("XDG_DATA_HOME", HOME / ".local/share")
 ).expanduser() / "quickshell-addons/matugen-vibrant"
@@ -76,6 +77,7 @@ TYPE_BLOCK_RE = re.compile(
 )
 
 QML_MARKERS = (
+    "matugen-vibrant import",
     "matugen-vibrant max-index",
     "matugen-vibrant keyboard-toggle",
     "matugen-vibrant scroll-position",
@@ -167,6 +169,25 @@ def replace_once(text: str, pattern: str, replacement: str, description: str) ->
 
 
 def patch_settings_popup(text: str) -> str:
+    if "BEGIN user-addon: matugen-vibrant card" in text:
+        if "BEGIN user-addon: matugen-vibrant import" not in text:
+            import_match = re.search(r'(?m)^import "\.\./"\s*$', text)
+            if not import_match:
+                raise PatchError("SettingsPopup local import anchor not found")
+            import_block = (
+                "\n// BEGIN user-addon: matugen-vibrant import\n"
+                'import "." as MatugenVibrant\n'
+                "// END user-addon: matugen-vibrant import"
+            )
+            text = text[: import_match.end()] + import_block + text[import_match.end() :]
+        text = re.sub(
+            r"^(\s*)VibrantMatugenCard\s*\{",
+            r"\1MatugenVibrant.VibrantMatugenCard {",
+            text,
+            count=1,
+            flags=re.MULTILINE,
+        )
+
     present_markers = [marker for marker in QML_MARKERS if f"BEGIN user-addon: {marker}" in text]
     if present_markers:
         if len(present_markers) != len(QML_MARKERS):
@@ -192,6 +213,16 @@ def patch_settings_popup(text: str) -> str:
     )
     addon_index = existing_max + 1
     addon_scroll_y = max(0, addon_index * 120 - 200)
+
+    import_match = re.search(r'(?m)^import "\.\./"\s*$', text)
+    if not import_match:
+        raise PatchError("SettingsPopup local import anchor not found")
+    import_block = (
+        "\n// BEGIN user-addon: matugen-vibrant import\n"
+        'import "." as MatugenVibrant\n'
+        "// END user-addon: matugen-vibrant import"
+    )
+    text = text[: import_match.end()] + import_block + text[import_match.end() :]
 
     max_indent = re.match(r"[ \t]*", max_line.group(0)).group(0)
     max_block = (
@@ -278,7 +309,7 @@ def patch_settings_popup(text: str) -> str:
     closing = find_matching_brace(text, opening)
     closing_line_start = text.rfind("\n", 0, closing) + 1
     card_block = f'''                    // BEGIN user-addon: matugen-vibrant card
-                    VibrantMatugenCard {{
+                    MatugenVibrant.VibrantMatugenCard {{
                         id: vibrantMatugenCard
                         uiScale: root.s(1)
                         highlighted: root.highlightedBox === {addon_index}
@@ -486,6 +517,26 @@ def regenerate_theme() -> None:
         subprocess.run(["bash", str(RELOAD_SCRIPT)], check=False)
 
 
+def reload_quickshell() -> None:
+    quickshell = shutil.which("quickshell")
+    pgrep = shutil.which("pgrep")
+    if not quickshell or not pgrep or not SHELL_QML.is_file():
+        return
+    running = subprocess.run(
+        [pgrep, "-f", f"quickshell.*{re.escape(str(SHELL_QML))}"],
+        capture_output=True,
+        text=True,
+    )
+    if running.returncode != 0:
+        return
+    subprocess.run(
+        [quickshell, "-p", str(SHELL_QML), "ipc", "call", "main", "forceReload"],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Install and manage vibrant Matugen colors")
     group = parser.add_mutually_exclusive_group()
@@ -539,6 +590,8 @@ def main() -> int:
         config_changed = sync_config(enabled)
         if explicit_toggle or template_changed or config_changed:
             regenerate_theme()
+        if popup_changed or card_changed:
+            reload_quickshell()
 
         changes = []
         if popup_changed:
