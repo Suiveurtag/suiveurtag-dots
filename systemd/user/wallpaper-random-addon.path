@@ -3,6 +3,7 @@ Description=Watch the upstream Quickshell wallpaper picker
 
 [Path]
 PathChanged=%h/.config/hypr/scripts/quickshell/wallpaper/WallpaperPicker.qml
+PathChanged=%h/.config/hypr/scripts/qs_manager.sh
 Unit=wallpaper-random-addon.service
 
 [Install]

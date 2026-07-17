@@ -33,6 +33,7 @@ What it does:
 - copies the user systemd units into `~/.config/systemd/user`
 - enables and starts the watcher path units
 - runs both patchers immediately
+- preserves current-wallpaper detection for filenames containing spaces
 - reloads Hyprland so the generated keybind file is refreshed
 
 ## Notes

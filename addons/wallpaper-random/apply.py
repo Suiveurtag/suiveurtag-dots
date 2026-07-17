@@ -22,6 +22,12 @@ PICKER = Path(
         HYPR_BASE / "scripts/quickshell/wallpaper/WallpaperPicker.qml",
     )
 ).expanduser()
+MANAGER = Path(
+    os.environ.get(
+        "WALLPAPER_RANDOM_MANAGER",
+        HYPR_BASE / "scripts/qs_manager.sh",
+    )
+).expanduser()
 ADDON_DIR = Path(
     os.environ.get("XDG_DATA_HOME", str(HOME / ".local/share"))
 ).expanduser() / "quickshell-addons/wallpaper-random"
@@ -143,6 +149,21 @@ BUTTON_BLOCK = """            // BEGIN user-addon: wallpaper-random button
             // END user-addon: wallpaper-random button
 
 """
+
+MANAGER_BLOCK = r'''        # BEGIN user-addon: wallpaper-current-selection
+        CURRENT_SRC=""
+        if pgrep -a "mpvpaper" > /dev/null; then
+            CURRENT_SRC=$(pgrep -a mpvpaper \
+                | sed -n "s#.* \($SRC_DIR/.*\)$#\1#p" \
+                | head -n1)
+        elif command -v awww >/dev/null; then
+            CURRENT_SRC=$(awww query 2>/dev/null \
+                | sed -n 's#^.*currently displaying: image: ##p' \
+                | grep -F "$SRC_DIR/" \
+                | head -n1)
+        fi
+        # END user-addon: wallpaper-current-selection
+'''
 
 
 class PatchError(RuntimeError):
@@ -271,6 +292,29 @@ def patch_picker(text: str) -> str:
     return text
 
 
+def patch_manager(text: str) -> str:
+    marked_block = re.compile(
+        r"^\s*# BEGIN user-addon: wallpaper-current-selection\n"
+        r".*?"
+        r"^\s*# END user-addon: wallpaper-current-selection\n",
+        flags=re.MULTILINE | re.DOTALL,
+    )
+    if marked_block.search(text):
+        return marked_block.sub(lambda _: MANAGER_BLOCK, text, count=1)
+
+    upstream_block = re.compile(
+        r'^\s*CURRENT_SRC=""\n'
+        r'^\s*if pgrep -a "mpvpaper" > /dev/null; then\n'
+        r'.*?'
+        r'^\s*fi\n'
+        r'(?=\n\s*TARGET_THUMB="")',
+        flags=re.MULTILINE | re.DOTALL,
+    )
+    if not upstream_block.search(text):
+        raise PatchError("current wallpaper detection block not found in qs_manager.sh")
+    return upstream_block.sub(lambda _: MANAGER_BLOCK.rstrip("\n"), text, count=1)
+
+
 def validate(path: Path) -> None:
     qmllint = shutil.which("qmllint")
     if qmllint is None:
@@ -289,6 +333,26 @@ def validate(path: Path) -> None:
     if result.returncode != 0:
         details = (result.stdout + result.stderr).strip()
         raise PatchError(f"qmllint rejected the patched file:\n{details}")
+
+
+def validate_shell(path: Path) -> None:
+    result = subprocess.run(
+        ["bash", "-n", str(path)],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        details = (result.stdout + result.stderr).strip()
+        raise PatchError(f"bash rejected the patched qs_manager.sh:\n{details}")
+
+
+def write_temporary(target: Path, content: str, prefix: str) -> Path:
+    fd, temporary_name = tempfile.mkstemp(prefix=prefix, dir=target.parent, text=True)
+    temporary = Path(temporary_name)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write(content)
+    os.chmod(temporary, target.stat().st_mode)
+    return temporary
 
 
 def install_assets() -> bool:
@@ -312,10 +376,15 @@ def main() -> int:
     if not PICKER.is_file():
         print(f"wallpaper-random: picker not found: {PICKER}", file=sys.stderr)
         return 1
+    if not MANAGER.is_file():
+        print(f"wallpaper-random: manager not found: {MANAGER}", file=sys.stderr)
+        return 1
 
     original = PICKER.read_text(encoding="utf-8")
+    manager_original = MANAGER.read_text(encoding="utf-8")
     try:
         patched = patch_picker(original)
+        manager_patched = patch_manager(manager_original)
     except PatchError as error:
         print(f"wallpaper-random: {error}; no file changed", file=sys.stderr)
         return 1
@@ -323,8 +392,9 @@ def main() -> int:
     validate(ADDON_DIR / "RandomWallpaperButton.qml")
     assets_changed = install_assets()
 
-    if patched == original:
+    if patched == original and manager_patched == manager_original:
         validate(PICKER)
+        validate_shell(MANAGER)
         status = "assets refreshed" if assets_changed else "addon already installed"
         print(f"wallpaper-random: {status}")
         return 0
@@ -332,25 +402,31 @@ def main() -> int:
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     backup = BACKUP_DIR / f"WallpaperPicker.qml.{timestamp}"
-    shutil.copy2(PICKER, backup)
-
-    fd, temporary_name = tempfile.mkstemp(
-        prefix=".WallpaperPicker.qml.",
-        dir=PICKER.parent,
-        text=True,
-    )
-    temporary = Path(temporary_name)
+    manager_backup = BACKUP_DIR / f"qs_manager.sh.{timestamp}"
+    backups = []
+    temporary = write_temporary(PICKER, patched, ".WallpaperPicker.qml.")
+    manager_temporary = write_temporary(MANAGER, manager_patched, ".qs_manager.sh.")
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            handle.write(patched)
-        os.chmod(temporary, PICKER.stat().st_mode)
         validate(temporary)
-        os.replace(temporary, PICKER)
+        validate_shell(manager_temporary)
+        if patched != original:
+            shutil.copy2(PICKER, backup)
+            backups.append(backup)
+            os.replace(temporary, PICKER)
+        else:
+            temporary.unlink()
+        if manager_patched != manager_original:
+            shutil.copy2(MANAGER, manager_backup)
+            backups.append(manager_backup)
+            os.replace(manager_temporary, MANAGER)
+        else:
+            manager_temporary.unlink()
     except Exception:
         temporary.unlink(missing_ok=True)
+        manager_temporary.unlink(missing_ok=True)
         raise
 
-    print(f"wallpaper-random: addon installed; backup: {backup}")
+    print(f"wallpaper-random: addon installed; backups: {', '.join(map(str, backups))}")
     return 0
 
 

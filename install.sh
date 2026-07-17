@@ -39,6 +39,7 @@ resolve_quickshell_dir() {
 
 QUICKSHELL_DIR="$(resolve_quickshell_dir)"
 WALLPAPER_PICKER="$QUICKSHELL_DIR/wallpaper/WallpaperPicker.qml"
+QS_MANAGER="$HYPR_BASE/scripts/qs_manager.sh"
 WINDOW_REGISTRY="$QUICKSHELL_DIR/WindowRegistry.js"
 HYPR_SETTINGS="${HYPR_SETTINGS:-$HYPR_BASE/settings.json}"
 
@@ -85,6 +86,7 @@ run_apply() {
     HYPR_QUICKSHELL_DIR="$QUICKSHELL_DIR" \
     HYPR_SETTINGS="$HYPR_SETTINGS" \
     WALLPAPER_RANDOM_PICKER="$WALLPAPER_PICKER" \
+    WALLPAPER_RANDOM_MANAGER="$QS_MANAGER" \
     "$@"
 }
 
@@ -113,13 +115,13 @@ if is_stub_hypr_config; then
     echo "  then re-run ./install.sh to apply these addons" >&2
     patch_failures=2
 else
-    if [[ -f "$WALLPAPER_PICKER" ]]; then
+    if [[ -f "$WALLPAPER_PICKER" && -f "$QS_MANAGER" ]]; then
         if ! run_apply WALLPAPER_RANDOM_APPLY_DELAY=0 "$ADDONS_DST/wallpaper-random/apply.sh"; then
             warn "wallpaper-random patch failed"
             patch_failures=$((patch_failures + 1))
         fi
     else
-        warn "upstream wallpaper picker not found at $WALLPAPER_PICKER"
+        warn "upstream wallpaper files not found (expected $WALLPAPER_PICKER and $QS_MANAGER)"
         echo "  install the Hyprland/Quickshell dots first; the watcher will apply this addon later" >&2
         patch_failures=$((patch_failures + 1))
     fi
