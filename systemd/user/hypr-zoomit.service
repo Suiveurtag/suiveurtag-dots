@@ -1,0 +1,10 @@
+[Unit]
+Description=Smooth ZoomIt-style magnifier for Hyprland
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/share/quickshell-addons/zoomit/zoomit.py daemon
+Restart=on-failure
+RestartSec=1

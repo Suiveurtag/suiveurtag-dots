@@ -63,6 +63,9 @@ install_addon() {
     mkdir -p "$dst"
     cp -a "$src/." "$dst/"
     chmod +x "$dst/apply.sh" "$dst/apply.py"
+    if [[ -f "$dst/zoomit.py" ]]; then
+        chmod +x "$dst/zoomit.py"
+    fi
 }
 
 install_systemd_units() {
@@ -107,18 +110,22 @@ run_apply() {
 install_addon "wallpaper-random"
 install_addon "emoji-picker"
 install_addon "matugen-vibrant"
+install_addon "zoomit"
 install_systemd_units
 
 if user_systemctl daemon-reload; then
-    if ! user_systemctl enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path; then
+    if ! user_systemctl try-restart hypr-zoomit.service; then
+        warn "could not refresh the ZoomIt zoom daemon"
+    fi
+    if ! user_systemctl enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path; then
         warn "could not enable addon watcher units"
-        echo "  run: systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path" >&2
+        echo "  run: systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path" >&2
     fi
 else
     warn "user systemd session is not available; units were installed but not enabled"
     echo "  after logging into a graphical session, run:" >&2
     echo "    systemctl --user daemon-reload" >&2
-    echo "    systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path" >&2
+    echo "    systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path" >&2
 fi
 
 patch_failures=0
@@ -162,6 +169,17 @@ else
         echo "  install the Hyprland/Quickshell dots first; the watcher will apply this addon later" >&2
         patch_failures=$((patch_failures + 1))
     fi
+
+    if [[ -f "$HYPR_SETTINGS" ]]; then
+        if ! run_apply ZOOMIT_APPLY_DELAY=0 "$ADDONS_DST/zoomit/apply.sh"; then
+            warn "zoomit patch failed"
+            patch_failures=$((patch_failures + 1))
+        fi
+    else
+        warn "Hyprland settings not found (expected $HYPR_SETTINGS)"
+        echo "  install the Hyprland dots first; the watcher will apply this addon later" >&2
+        patch_failures=$((patch_failures + 1))
+    fi
 fi
 
 compile_hypr_keybinds() {
@@ -173,8 +191,16 @@ compile_hypr_keybinds() {
     fi
 }
 
+reload_quickshell_settings() {
+    local shell_qml="$QUICKSHELL_DIR/Shell.qml"
+    if command -v qs >/dev/null 2>&1 && [[ -f "$shell_qml" ]]; then
+        qs -p "$shell_qml" ipc call main forceReload >/dev/null 2>&1 || true
+    fi
+}
+
 if ! is_stub_hypr_config; then
     compile_hypr_keybinds
+    reload_quickshell_settings
 fi
 
 if (( patch_failures > 0 )); then
@@ -182,4 +208,4 @@ if (( patch_failures > 0 )); then
     exit 0
 fi
 
-echo "Installed wallpaper-random, emoji-picker and matugen-vibrant addons."
+echo "Installed wallpaper-random, emoji-picker, matugen-vibrant and zoomit addons."

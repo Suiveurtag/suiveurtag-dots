@@ -7,6 +7,7 @@ This repo currently contains:
 - `wallpaper-random`: random wallpaper button for the wallpaper picker
 - `emoji-picker`: emoji keyboard on `Super+J`
 - `matugen-vibrant`: optional wallpaper-matched expanded color palette
+- `zoomit`: smooth cursor-following magnifier and frozen-screen drawing overlay
 
 These addons are designed to stay isolated from the upstream dots:
 
@@ -43,4 +44,11 @@ What it does:
 - The emoji picker keeps its keybind in `settings.json`, so it survives the dots' keybind regeneration flow.
 - Vibrant Matugen colors are opt-in under **Settings → General**. Enabling the option uses Matugen's vibrant scheme for Quickshell and maps the image-derived Base16 accents to the full UI palette with a small saturation boost.
 - The Matugen addon saves the latest upstream Quickshell color template before overriding it. Disabling the option restores that template, and the watcher repeats the process after dots updates.
+- ZoomIt-style shortcuts are added to **Settings → Keybinds** and can be edited there:
+  - `Super+Alt+Z`: smoothly toggle a 2× cursor-following zoom. While active, use the wheel to zoom further in or return to 1×.
+  - `Super+Alt+D`: toggle drawing on a frozen image of the screen under the cursor.
+- Drawing controls follow ZoomIt conventions: drag to draw, `Shift`+drag for a line, `Ctrl`+drag for a rectangle, `Ctrl+Shift`+drag for an arrow, and hold `Tab` (or `Alt`) while dragging for an ellipse. `R/G/B/Y/O/P` select colors, `Ctrl+wheel` changes pen width, `Ctrl+Z` undoes, `E` clears, `W`/`K` select a white/black board, and right-click or `Esc` exits.
+- The zoom uses Hyprland's native compositor magnifier, with anti-aliasing enabled and a 120 fps eased transition. The drawing overlay requires the commands `grim`, `qs`, and `qmllint` (already present in ilyamiro's dots setup).
+- Installation refreshes the running Quickshell instance so newly added ZoomIt shortcuts appear in **Settings → Keybinds** immediately.
+- Custom ZoomIt key combinations selected in **Settings → Keybinds** are preserved by the addon watcher; defaults are only recreated when an addon entry is missing.
 - If you pull new upstream dots later, the path units should reapply the addons automatically.
