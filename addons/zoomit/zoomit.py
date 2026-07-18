@@ -158,8 +158,8 @@ class ZoomDaemon:
         set_keyword(self.hypr_socket, "cursor:zoom_rigid", 1)
         set_keyword(self.hypr_socket, "cursor:zoom_detached_camera", 0)
         set_keyword(self.hypr_socket, "binds:scroll_event_delay", 18)
-        set_keyword(self.hypr_socket, "bind", f", mouse_up, exec, {command} zoom-in")
-        set_keyword(self.hypr_socket, "bind", f", mouse_down, exec, {command} zoom-out")
+        set_keyword(self.hypr_socket, "bind", f", mouse_up, exec, {command} zoom-out")
+        set_keyword(self.hypr_socket, "bind", f", mouse_down, exec, {command} zoom-in")
         self.bindings_active = True
 
     def restore_runtime_state(self) -> None:
