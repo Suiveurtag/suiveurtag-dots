@@ -315,6 +315,13 @@ def patch_addon_category(text: str) -> str:
     if ADDON_CATEGORY_BEGIN in text:
         if ADDON_CATEGORY_END not in text:
             raise PatchError("partial Addons category patch detected")
+        if "                            AddonSettingsPage {" in text:
+            return replace_once(
+                text,
+                "                            AddonSettingsPage {",
+                "                            MusicVisualizerSettings.AddonSettingsPage {",
+                "qualified Addons page type",
+            )
         return text
 
     required_markers = (
@@ -471,7 +478,7 @@ def patch_addon_category(text: str) -> str:
                         opacity: visible ? 1.0 : 0.0
                         Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutExpo } }
                         sourceComponent: Component {
-                            AddonSettingsPage {
+                            MusicVisualizerSettings.AddonSettingsPage {
                                 uiScale: root.s(1)
                                 highlightedBox: root.highlightedBox
                                 settingsPath: Config.settingsJsonPath

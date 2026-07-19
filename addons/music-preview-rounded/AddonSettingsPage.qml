@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import "." as AddonCards
 
 Item {
     id: root
@@ -42,7 +43,7 @@ Item {
             width: parent.width
             spacing: root.s(10)
 
-            VibrantMatugenCard {
+            AddonCards.VibrantMatugenCard {
                 id: vibrantCard
                 uiScale: root.uiScale
                 highlighted: root.highlightedBox === 0
@@ -57,7 +58,7 @@ Item {
                 onSelected: root.selected(0)
             }
 
-            ScreenshotFreezeCard {
+            AddonCards.ScreenshotFreezeCard {
                 id: screenshotCard
                 uiScale: root.uiScale
                 highlighted: root.highlightedBox === 1
@@ -72,7 +73,7 @@ Item {
                 onSelected: root.selected(1)
             }
 
-            MusicVisualizerCard {
+            AddonCards.MusicVisualizerCard {
                 id: visualizerCard
                 uiScale: root.uiScale
                 highlighted: root.highlightedBox === 2
