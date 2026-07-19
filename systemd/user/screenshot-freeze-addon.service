@@ -1,0 +1,6 @@
+[Unit]
+Description=Reapply the frozen screenshot addon
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/share/quickshell-addons/screenshot-freeze/apply.sh

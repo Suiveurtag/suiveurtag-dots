@@ -19,6 +19,7 @@ from pathlib import Path
 HOME = Path.home()
 XDG_CONFIG_HOME = Path(os.environ.get("XDG_CONFIG_HOME", HOME / ".config")).expanduser()
 XDG_CACHE_HOME = Path(os.environ.get("XDG_CACHE_HOME", HOME / ".cache")).expanduser()
+XDG_RUNTIME_DIR = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")).expanduser()
 HYPR_BASE = Path(os.environ.get("HYPR_CONFIG_DIR", XDG_CONFIG_HOME / "hypr")).expanduser()
 QS_DIR = Path(
     os.environ.get("HYPR_QUICKSHELL_DIR", HYPR_BASE / "scripts/quickshell")
@@ -65,7 +66,7 @@ CARD_TARGET = SETTINGS_POPUP.parent / "VibrantMatugenCard.qml"
 VIBRANT_TEMPLATE = ADDON_DIR / "qs_colors.json.template"
 STOCK_TEMPLATE = STATE_DIR / "upstream-qs_colors.json.template"
 TYPE_STATE = STATE_DIR / "quickshell-type.json"
-LOCK_FILE = STATE_DIR / "apply.lock"
+LOCK_FILE = XDG_RUNTIME_DIR / "quickshell-addons-settings.lock"
 
 TEMPLATE_MARKER = '"_matugenVibrantAddon": true'
 TYPE_BEGIN = "# BEGIN user-addon: matugen-vibrant scheme"
@@ -551,6 +552,7 @@ def main() -> int:
         raise PatchError(f"SettingsPopup.qml not found: {SETTINGS_POPUP}")
 
     STATE_DIR.mkdir(parents=True, exist_ok=True)
+    LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
     with LOCK_FILE.open("a+", encoding="utf-8") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
 
