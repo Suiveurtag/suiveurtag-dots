@@ -34,6 +34,7 @@ ASSETS = {
     ADDON_DIR / "MusicVisualizer.qml": QS_DIR / "MusicVisualizer.qml",
     ADDON_DIR / "MusicVisualizerData.qml": QS_DIR / "MusicVisualizerData.qml",
     ADDON_DIR / "MusicVisualizerCard.qml": SETTINGS_POPUP.parent / "MusicVisualizerCard.qml",
+    ADDON_DIR / "AddonSettingsPage.qml": SETTINGS_POPUP.parent / "AddonSettingsPage.qml",
 }
 
 IMPORT_BEGIN = "// BEGIN user-addon: music-preview-rounded import"
@@ -49,6 +50,8 @@ POPUP_MARKERS = (
     "music-visualizer search-card",
     "music-visualizer card",
 )
+ADDON_CATEGORY_BEGIN = "// BEGIN user-addon: addon-settings category"
+ADDON_CATEGORY_END = "// END user-addon: addon-settings category"
 
 
 class PatchError(RuntimeError):
@@ -302,6 +305,200 @@ def patch_settings_popup(text: str) -> str:
     return text[:closing] + card_block + text[closing:]
 
 
+def replace_once(text: str, old: str, new: str, description: str) -> str:
+    if text.count(old) != 1:
+        raise PatchError(f"addon category anchor not found: {description}")
+    return text.replace(old, new, 1)
+
+
+def patch_addon_category(text: str) -> str:
+    if ADDON_CATEGORY_BEGIN in text:
+        if ADDON_CATEGORY_END not in text:
+            raise PatchError("partial Addons category patch detected")
+        return text
+
+    required_markers = (
+        "matugen-vibrant card",
+        "screenshot-freeze card",
+        "music-visualizer card",
+    )
+    if any(f"BEGIN user-addon: {marker}" not in text for marker in required_markers):
+        raise PatchError("all addon setting cards must be installed before creating the Addons tab")
+
+    max_match = re.search(r"(?m)^(?P<indent>\s*)if \(tab === 0\) return \d+;\s*$", text)
+    if not max_match:
+        raise PatchError("General maximum index not found")
+    indent = max_match.group("indent")
+    max_block = f"{indent}if (tab === 0) return 6;\n{indent}if (tab === 5) return 2;"
+    text = text[: max_match.start()] + max_block + text[max_match.end() :]
+
+    tab_properties = (
+        '    property var tabNames: ["General", "Weather", "Keybinds", "Monitors", "Startup"]\n'
+        '    property var tabIcons: ["󰒓", "󰖐", "󰌌", "󰍹", "󰐥"]\n'
+        '    property var tabColors: ["teal", "blue", "peach", "green", "mauve"]'
+    )
+    category_properties = (
+        f"    {ADDON_CATEGORY_BEGIN}\n"
+        '    property var tabNames: ["General", "Weather", "Keybinds", "Monitors", "Startup", "Addons"]\n'
+        '    property var tabIcons: ["󰒓", "󰖐", "󰌌", "󰍹", "󰐥", "󰏖"]\n'
+        '    property var tabColors: ["teal", "blue", "peach", "green", "mauve", "sapphire"]\n'
+        f"    {ADDON_CATEGORY_END}"
+    )
+    text = replace_once(text, tab_properties, category_properties, "tab metadata")
+    text = replace_once(
+        text,
+        "    property bool tab4Loaded: false",
+        "    property bool tab4Loaded: false\n    property bool tab5Loaded: false",
+        "Addons loaded state",
+    )
+    text = replace_once(
+        text,
+        "        else if (currentTab === 4) root.tab4Loaded = true;",
+        "        else if (currentTab === 4) root.tab4Loaded = true;\n        else if (currentTab === 5) root.tab5Loaded = true;",
+        "Addons tab loading",
+    )
+    text = replace_once(
+        text,
+        "        root.currentTab = (root.currentTab + 1) % 5;",
+        "        root.currentTab = (root.currentTab + 1) % root.tabNames.length;",
+        "forward tab cycling",
+    )
+    text = replace_once(
+        text,
+        "        root.currentTab = (root.currentTab + 4) % 5;",
+        "        root.currentTab = (root.currentTab + root.tabNames.length - 1) % root.tabNames.length;",
+        "backward tab cycling",
+    )
+
+    activation_anchor = "        } else if (root.currentTab === 1) {"
+    activation_block = (
+        "        } else if (root.currentTab === 5) {\n"
+        "            if (root.highlightedBox === 0 && addonsLoader.item) addonsLoader.item.toggleVibrantMatugen();\n"
+        "            else if (root.highlightedBox === 1 && addonsLoader.item) addonsLoader.item.toggleScreenshotFreeze();\n"
+        "            else if (root.highlightedBox === 2 && addonsLoader.item) addonsLoader.item.toggleMusicVisualizer();\n"
+        "        } else if (root.currentTab === 1) {"
+    )
+    text = replace_once(text, activation_anchor, activation_block, "Addons keyboard activation")
+
+    scroll_anchor = "        } else if (root.currentTab === 1 && weatherLoader.item) {"
+    scroll_block = (
+        "        } else if (root.currentTab === 5 && addonsLoader.item) {\n"
+        "            addonsLoader.item.scrollToBox(box);\n"
+        "        } else if (root.currentTab === 1 && weatherLoader.item) {"
+    )
+    text = replace_once(text, scroll_anchor, scroll_block, "Addons keyboard scrolling")
+
+    jump_anchor = "                } else if (targetTab === 1 && weatherLoader.item) {"
+    jump_block = (
+        "                } else if (targetTab === 5 && addonsLoader.item) {\n"
+        "                    addonsLoader.item.scrollToBox(targetBox);\n"
+        "                } else if (targetTab === 1 && weatherLoader.item) {"
+    )
+    text = replace_once(text, jump_anchor, jump_block, "Addons search navigation")
+
+    search_replacements = (
+        (
+            r'\{ tab: 0, boxIndex: \d+, label: "Vibrant Matugen colors"',
+            '{ tab: 5, boxIndex: 0, label: "Vibrant Matugen colors"',
+        ),
+        (
+            r'\{ tab: 0, boxIndex: \d+, label: "Freeze screen during selection"',
+            '{ tab: 5, boxIndex: 1, label: "Freeze screen during selection"',
+        ),
+        (
+            r'\{ tab: 0, boxIndex: \d+, label: "Music visualizer"',
+            '{ tab: 5, boxIndex: 2, label: "Music visualizer"',
+        ),
+    )
+    for pattern, replacement in search_replacements:
+        text, count = re.subn(pattern, replacement, text, count=1)
+        if count != 1:
+            raise PatchError("addon search card could not be moved")
+
+    hidden_cards = (
+        "MatugenVibrant.VibrantMatugenCard {",
+        "ScreenshotFreeze.ScreenshotFreezeCard {",
+        "MusicVisualizerSettings.MusicVisualizerCard {",
+    )
+    for opening_line in hidden_cards:
+        replacement = opening_line + "\n                        visible: false"
+        text = replace_once(text, opening_line, replacement, f"hide {opening_line}")
+
+    text = replace_once(
+        text,
+        "                        highlighted: root.highlightedBox === 7",
+        "                        highlighted: false",
+        "hidden Matugen highlight",
+    )
+    text = replace_once(
+        text,
+        "                        highlighted: root.highlightedBox === 8",
+        "                        highlighted: false",
+        "hidden screenshot highlight",
+    )
+    text = replace_once(
+        text,
+        "                        highlighted: root.highlightedBox === 9",
+        "                        highlighted: false",
+        "hidden visualizer highlight",
+    )
+
+    text = replace_once(
+        text,
+        "                        visible: root.currentTab !== 2 && root.currentTab !== 4 && !root.isSearchMode",
+        "                        visible: root.currentTab !== 2 && root.currentTab !== 4 && root.currentTab !== 5 && !root.isSearchMode",
+        "hide Save on Addons",
+    )
+    text = replace_once(
+        text,
+        "                            property color c4: root.mauve",
+        "                            property color c4: root.mauve\n                            property color c5: root.sapphire",
+        "Addons tab highlight color",
+    )
+    text = replace_once(
+        text,
+        "                                if (root.currentTab === 3) return c3;\n                                return c4;",
+        "                                if (root.currentTab === 3) return c3;\n                                if (root.currentTab === 4) return c4;\n                                return c5;",
+        "Addons highlight selection",
+    )
+
+    monitors_loader = "                    Loader {\n                        id: monitorsLoader"
+    addons_loader = '''                    Loader {
+                        id: addonsLoader
+                        anchors.fill: parent
+                        active: root.tab5Loaded && Config.dataReady
+                        visible: root.currentTab === 5 && !root.isSearchMode
+                        opacity: visible ? 1.0 : 0.0
+                        Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutExpo } }
+                        sourceComponent: Component {
+                            AddonSettingsPage {
+                                uiScale: root.s(1)
+                                highlightedBox: root.highlightedBox
+                                settingsPath: Config.settingsJsonPath
+                                tealColor: root.teal
+                                blueColor: root.blue
+                                mauveColor: root.mauve
+                                baseColor: root.base
+                                textColor: root.text
+                                subtextColor: root.subtext0
+                                surface0Color: root.surface0
+                                surface1Color: root.surface1
+                                surface2Color: root.surface2
+                                onSelected: index => root.highlightedBox = index
+                            }
+                        }
+                    }
+
+                    Loader {
+                        id: monitorsLoader'''
+    text = replace_once(text, monitors_loader, addons_loader, "Addons loader")
+    return text
+
+
+def patch_settings_with_category(text: str) -> str:
+    return patch_addon_category(patch_settings_popup(text))
+
+
 def atomic_write(path: Path, content: str) -> None:
     descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent, text=True)
     temporary = Path(temporary_name)
@@ -427,7 +624,7 @@ def main() -> int:
             changes.append("visualizer assets")
         if patch_file(TOPBAR, patch_topbar):
             changes.append("top bar")
-        if patch_file(SETTINGS_POPUP, patch_settings_popup):
+        if patch_file(SETTINGS_POPUP, patch_settings_with_category):
             changes.append("settings UI")
         if changes:
             reload_quickshell()
