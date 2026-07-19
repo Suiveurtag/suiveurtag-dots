@@ -110,6 +110,7 @@ run_apply() {
     SCREENSHOT_FREEZE_OVERLAY="$SCREENSHOT_OVERLAY" \
     SCREENSHOT_FREEZE_SETTINGS_POPUP="$SCREENSHOT_SETTINGS_POPUP" \
     MUSIC_PREVIEW_TOPBAR="$TOPBAR_QML" \
+    MUSIC_VISUALIZER_SETTINGS_POPUP="$SCREENSHOT_SETTINGS_POPUP" \
     WALLPAPER_RANDOM_PICKER="$WALLPAPER_PICKER" \
     WALLPAPER_RANDOM_MANAGER="$QS_MANAGER" \
     "$@"
@@ -202,13 +203,13 @@ else
         patch_failures=$((patch_failures + 1))
     fi
 
-    if [[ -f "$TOPBAR_QML" ]]; then
+    if [[ -f "$TOPBAR_QML" && -f "$SCREENSHOT_SETTINGS_POPUP" && -f "$HYPR_SETTINGS" ]]; then
         if ! run_apply MUSIC_PREVIEW_ROUNDED_APPLY_DELAY=0 "$ADDONS_DST/music-preview-rounded/apply.sh"; then
             warn "music-preview-rounded patch failed"
             patch_failures=$((patch_failures + 1))
         fi
     else
-        warn "Quickshell top bar not found (expected $TOPBAR_QML)"
+        warn "Quickshell music visualizer files not found (expected $TOPBAR_QML, $SCREENSHOT_SETTINGS_POPUP and $HYPR_SETTINGS)"
         echo "  install the Hyprland/Quickshell dots first; the watcher will apply this addon later" >&2
         patch_failures=$((patch_failures + 1))
     fi

@@ -3,6 +3,8 @@ Description=Watch the Quickshell top bar music preview
 
 [Path]
 PathChanged=%h/.config/hypr/scripts/quickshell/TopBar.qml
+PathChanged=%h/.config/hypr/scripts/quickshell/settings/SettingsPopup.qml
+PathChanged=%h/.config/hypr/settings.json
 Unit=music-preview-rounded-addon.service
 
 [Install]

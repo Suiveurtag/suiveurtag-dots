@@ -9,7 +9,7 @@ This repo currently contains:
 - `matugen-vibrant`: optional wallpaper-matched expanded color palette
 - `zoomit`: smooth cursor-following magnifier and frozen-screen drawing overlay
 - `screenshot-freeze`: optional Windows-style frozen screen while selecting a screenshot region
-- `music-preview-rounded`: properly rounded album artwork in the Quickshell top bar
+- `music-preview-rounded`: rounded album artwork and an optional CAVA visualizer in the Quickshell top bar
 
 These addons are designed to stay isolated from the upstream dots:
 
@@ -46,6 +46,7 @@ What it does:
 - The emoji picker keeps its keybind in `settings.json`, so it survives the dots' keybind regeneration flow.
 - Vibrant Matugen colors are opt-in under **Settings → General**. Enabling the option uses Matugen's vibrant scheme for Quickshell and maps the image-derived Base16 accents to the full UI palette with a small saturation boost.
 - Frozen screenshot selection is enabled by default under **Settings → General → Freeze screen during selection**. It freezes regional screenshots, including edit mode, while full-screen screenshots remain instant and screen recording stays live.
+- The CAVA music visualizer is opt-in under **Settings → General → Music visualizer**. It replaces the previous/play/next buttons with a smooth Matugen-colored spectrum; click the spectrum to play or pause.
 - The Matugen addon saves the latest upstream Quickshell color template before overriding it. Disabling the option restores that template, and the watcher repeats the process after dots updates.
 - ZoomIt-style shortcuts are added to **Settings → Keybinds** and can be edited there:
   - `Super+Alt+Z`: smoothly toggle a 2× cursor-following zoom. While active, use the wheel to zoom further in or return to 1×.
