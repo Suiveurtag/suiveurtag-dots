@@ -26,7 +26,7 @@ Item {
             Rectangle {
                 required property int index
                 width: root.s(4)
-                height: Math.max(root.s(4), root.s(26) * MusicVisualizerData.bands[index])
+                height: Math.max(root.s(4), root.s(33) * Math.pow(MusicVisualizerData.bands[index], 0.7))
                 radius: width / 2
                 anchors.verticalCenter: parent.verticalCenter
 
