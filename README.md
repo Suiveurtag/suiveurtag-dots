@@ -9,6 +9,7 @@ This repo currently contains:
 - `matugen-vibrant`: optional wallpaper-matched expanded color palette
 - `zoomit`: smooth cursor-following magnifier and frozen-screen drawing overlay
 - `screenshot-freeze`: optional Windows-style frozen screen while selecting a screenshot region
+- `music-preview-rounded`: properly rounded album artwork in the Quickshell top bar
 
 These addons are designed to stay isolated from the upstream dots:
 

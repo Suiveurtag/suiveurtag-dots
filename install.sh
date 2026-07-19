@@ -52,6 +52,7 @@ MATUGEN_WALLPAPER_CACHE="${MATUGEN_WALLPAPER_CACHE:-$CACHE_BASE/quickshell/wallp
 SCREENSHOT_SCRIPT="$HYPR_BASE/scripts/screenshot.sh"
 SCREENSHOT_OVERLAY="$QUICKSHELL_DIR/ScreenshotOverlay.qml"
 SCREENSHOT_SETTINGS_POPUP="$QUICKSHELL_DIR/settings/SettingsPopup.qml"
+TOPBAR_QML="$QUICKSHELL_DIR/TopBar.qml"
 
 install_addon() {
     local name="$1"
@@ -108,6 +109,7 @@ run_apply() {
     SCREENSHOT_FREEZE_SCRIPT="$SCREENSHOT_SCRIPT" \
     SCREENSHOT_FREEZE_OVERLAY="$SCREENSHOT_OVERLAY" \
     SCREENSHOT_FREEZE_SETTINGS_POPUP="$SCREENSHOT_SETTINGS_POPUP" \
+    MUSIC_PREVIEW_TOPBAR="$TOPBAR_QML" \
     WALLPAPER_RANDOM_PICKER="$WALLPAPER_PICKER" \
     WALLPAPER_RANDOM_MANAGER="$QS_MANAGER" \
     "$@"
@@ -118,21 +120,22 @@ install_addon "emoji-picker"
 install_addon "matugen-vibrant"
 install_addon "zoomit"
 install_addon "screenshot-freeze"
+install_addon "music-preview-rounded"
 install_systemd_units
 
 if user_systemctl daemon-reload; then
     if ! user_systemctl try-restart hypr-zoomit.service; then
         warn "could not refresh the ZoomIt zoom daemon"
     fi
-    if ! user_systemctl enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path; then
+    if ! user_systemctl enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path music-preview-rounded-addon.path; then
         warn "could not enable addon watcher units"
-        echo "  run: systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path" >&2
+        echo "  run: systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path music-preview-rounded-addon.path" >&2
     fi
 else
     warn "user systemd session is not available; units were installed but not enabled"
     echo "  after logging into a graphical session, run:" >&2
     echo "    systemctl --user daemon-reload" >&2
-    echo "    systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path" >&2
+    echo "    systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path music-preview-rounded-addon.path" >&2
 fi
 
 patch_failures=0
@@ -198,6 +201,17 @@ else
         echo "  install the Hyprland/Quickshell dots first; the watcher will apply this addon later" >&2
         patch_failures=$((patch_failures + 1))
     fi
+
+    if [[ -f "$TOPBAR_QML" ]]; then
+        if ! run_apply MUSIC_PREVIEW_ROUNDED_APPLY_DELAY=0 "$ADDONS_DST/music-preview-rounded/apply.sh"; then
+            warn "music-preview-rounded patch failed"
+            patch_failures=$((patch_failures + 1))
+        fi
+    else
+        warn "Quickshell top bar not found (expected $TOPBAR_QML)"
+        echo "  install the Hyprland/Quickshell dots first; the watcher will apply this addon later" >&2
+        patch_failures=$((patch_failures + 1))
+    fi
 fi
 
 compile_hypr_keybinds() {
@@ -226,4 +240,4 @@ if (( patch_failures > 0 )); then
     exit 0
 fi
 
-echo "Installed wallpaper-random, emoji-picker, matugen-vibrant, zoomit and screenshot-freeze addons."
+echo "Installed wallpaper-random, emoji-picker, matugen-vibrant, zoomit, screenshot-freeze and music-preview-rounded addons."
