@@ -121,6 +121,7 @@ install_addon "emoji-picker"
 install_addon "matugen-vibrant"
 install_addon "zoomit"
 install_addon "screenshot-freeze"
+install_addon "idle-inhibit"
 install_addon "music-preview-rounded"
 install_systemd_units
 
@@ -128,15 +129,15 @@ if user_systemctl daemon-reload; then
     if ! user_systemctl try-restart hypr-zoomit.service; then
         warn "could not refresh the ZoomIt zoom daemon"
     fi
-    if ! user_systemctl enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path music-preview-rounded-addon.path; then
+    if ! user_systemctl enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path; then
         warn "could not enable addon watcher units"
-        echo "  run: systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path music-preview-rounded-addon.path" >&2
+        echo "  run: systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path" >&2
     fi
 else
     warn "user systemd session is not available; units were installed but not enabled"
     echo "  after logging into a graphical session, run:" >&2
     echo "    systemctl --user daemon-reload" >&2
-    echo "    systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path music-preview-rounded-addon.path" >&2
+    echo "    systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path" >&2
 fi
 
 patch_failures=0
@@ -213,6 +214,17 @@ else
         echo "  install the Hyprland/Quickshell dots first; the watcher will apply this addon later" >&2
         patch_failures=$((patch_failures + 1))
     fi
+
+    if [[ -f "$HYPR_SETTINGS" ]]; then
+        if ! run_apply IDLE_INHIBIT_APPLY_DELAY=0 "$ADDONS_DST/idle-inhibit/apply.sh"; then
+            warn "idle-inhibit patch failed"
+            patch_failures=$((patch_failures + 1))
+        fi
+    else
+        warn "Hyprland settings not found (expected $HYPR_SETTINGS)"
+        echo "  install the Hyprland dots first; the watcher will apply this addon later" >&2
+        patch_failures=$((patch_failures + 1))
+    fi
 fi
 
 compile_hypr_keybinds() {
@@ -241,4 +253,4 @@ if (( patch_failures > 0 )); then
     exit 0
 fi
 
-echo "Installed wallpaper-random, emoji-picker, matugen-vibrant, zoomit, screenshot-freeze and music-preview-rounded addons."
+echo "Installed wallpaper-random, emoji-picker, matugen-vibrant, zoomit, screenshot-freeze, idle-inhibit and music-preview-rounded addons."

@@ -1,0 +1,6 @@
+[Unit]
+Description=Apply the idle sleep and lock setting
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/share/quickshell-addons/idle-inhibit/apply.sh

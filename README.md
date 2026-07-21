@@ -9,6 +9,7 @@ This repo currently contains:
 - `matugen-vibrant`: optional wallpaper-matched expanded color palette
 - `zoomit`: smooth cursor-following magnifier and frozen-screen drawing overlay
 - `screenshot-freeze`: optional Windows-style frozen screen while selecting a screenshot region
+- `idle-inhibit`: optional switch that disables automatic idle locking and suspension
 - `music-preview-rounded`: rounded album artwork and an optional CAVA visualizer in the Quickshell top bar
 
 These addons are designed to stay isolated from the upstream dots:
@@ -47,6 +48,7 @@ What it does:
 - Vibrant Matugen colors are opt-in under **Settings → Addons**. Enabling the option uses Matugen's vibrant scheme for Quickshell and maps the image-derived Base16 accents to the full UI palette with a small saturation boost.
 - Frozen screenshot selection is enabled by default under **Settings → Addons → Freeze screen during selection**. It freezes regional screenshots, including edit mode, while full-screen screenshots remain instant and screen recording stays live.
 - The CAVA music visualizer is opt-in under **Settings → Addons → Music visualizer**. It replaces the previous/play/next buttons with a smooth Matugen-colored spectrum; click the spectrum to play or pause.
+- **Settings → Addons → Disable idle sleep and lock** stops `hypridle` immediately and removes it from startup. Turning the option off restores the daemon; manual locking and suspension remain available.
 - The Matugen addon saves the latest upstream Quickshell color template before overriding it. Disabling the option restores that template, and the watcher repeats the process after dots updates.
 - ZoomIt-style shortcuts are added to **Settings → Keybinds** and can be edited there:
   - `Super+Alt+Z`: smoothly toggle a 2× cursor-following zoom. While active, use the wheel to zoom further in or return to 1×.

@@ -27,6 +27,7 @@ SETTINGS_POPUP = Path(
 SETTINGS = Path(os.environ.get("HYPR_SETTINGS", HYPR_BASE / "settings.json")).expanduser()
 SHELL_QML = QS_DIR / "Shell.qml"
 ADDON_DIR = XDG_DATA_HOME / "quickshell-addons/music-preview-rounded"
+IDLE_ADDON_DIR = XDG_DATA_HOME / "quickshell-addons/idle-inhibit"
 BACKUP_DIR = ADDON_DIR / "backups"
 LOCK_FILE = XDG_RUNTIME_DIR / "quickshell-addons-settings.lock"
 
@@ -34,6 +35,7 @@ ASSETS = {
     ADDON_DIR / "MusicVisualizer.qml": QS_DIR / "MusicVisualizer.qml",
     ADDON_DIR / "MusicVisualizerData.qml": QS_DIR / "MusicVisualizerData.qml",
     ADDON_DIR / "MusicVisualizerCard.qml": SETTINGS_POPUP.parent / "MusicVisualizerCard.qml",
+    IDLE_ADDON_DIR / "IdleInhibitCard.qml": SETTINGS_POPUP.parent / "IdleInhibitCard.qml",
     ADDON_DIR / "AddonSettingsPage.qml": SETTINGS_POPUP.parent / "AddonSettingsPage.qml",
 }
 
@@ -316,13 +318,13 @@ def patch_addon_category(text: str) -> str:
         if ADDON_CATEGORY_END not in text:
             raise PatchError("partial Addons category patch detected")
         if "                            AddonSettingsPage {" in text:
-            return replace_once(
+            text = replace_once(
                 text,
                 "                            AddonSettingsPage {",
                 "                            MusicVisualizerSettings.AddonSettingsPage {",
                 "qualified Addons page type",
             )
-        return text
+        return upgrade_idle_setting(text)
 
     required_markers = (
         "matugen-vibrant card",
@@ -336,7 +338,7 @@ def patch_addon_category(text: str) -> str:
     if not max_match:
         raise PatchError("General maximum index not found")
     indent = max_match.group("indent")
-    max_block = f"{indent}if (tab === 0) return 6;\n{indent}if (tab === 5) return 2;"
+    max_block = f"{indent}if (tab === 0) return 6;\n{indent}if (tab === 5) return 3;"
     text = text[: max_match.start()] + max_block + text[max_match.end() :]
 
     tab_properties = (
@@ -383,6 +385,7 @@ def patch_addon_category(text: str) -> str:
         "            if (root.highlightedBox === 0 && addonsLoader.item) addonsLoader.item.toggleVibrantMatugen();\n"
         "            else if (root.highlightedBox === 1 && addonsLoader.item) addonsLoader.item.toggleScreenshotFreeze();\n"
         "            else if (root.highlightedBox === 2 && addonsLoader.item) addonsLoader.item.toggleMusicVisualizer();\n"
+        "            else if (root.highlightedBox === 3 && addonsLoader.item) addonsLoader.item.toggleIdleInhibit();\n"
         "        } else if (root.currentTab === 1) {"
     )
     text = replace_once(text, activation_anchor, activation_block, "Addons keyboard activation")
@@ -499,6 +502,35 @@ def patch_addon_category(text: str) -> str:
                     Loader {
                         id: monitorsLoader'''
     text = replace_once(text, monitors_loader, addons_loader, "Addons loader")
+    return upgrade_idle_setting(text)
+
+
+def upgrade_idle_setting(text: str) -> str:
+    text = text.replace("if (tab === 5) return 2;", "if (tab === 5) return 3;", 1)
+
+    activation_anchor = (
+        "            else if (root.highlightedBox === 2 && addonsLoader.item) "
+        "addonsLoader.item.toggleMusicVisualizer();"
+    )
+    idle_activation = (
+        activation_anchor
+        + "\n            else if (root.highlightedBox === 3 && addonsLoader.item) "
+        "addonsLoader.item.toggleIdleInhibit();"
+    )
+    if "addonsLoader.item.toggleIdleInhibit()" not in text:
+        text = replace_once(text, activation_anchor, idle_activation, "idle setting keyboard activation")
+
+    search_begin = "// BEGIN user-addon: idle-inhibit search-card"
+    if search_begin not in text:
+        search_anchor = "        // END user-addon: music-visualizer search-card\n"
+        search_block = (
+            search_anchor
+            + "        // BEGIN user-addon: idle-inhibit search-card\n"
+            + '        { tab: 5, boxIndex: 3, label: "Disable idle sleep and lock", '
+            + 'desc: "Keep the session awake", icon: "󰒲", color: "sapphire" },\n'
+            + "        // END user-addon: idle-inhibit search-card\n"
+        )
+        text = replace_once(text, search_anchor, search_block, "idle setting search card")
     return text
 
 
