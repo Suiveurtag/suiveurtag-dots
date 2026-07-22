@@ -53,6 +53,8 @@ SCREENSHOT_SCRIPT="$HYPR_BASE/scripts/screenshot.sh"
 SCREENSHOT_OVERLAY="$QUICKSHELL_DIR/ScreenshotOverlay.qml"
 SCREENSHOT_SETTINGS_POPUP="$QUICKSHELL_DIR/settings/SettingsPopup.qml"
 TOPBAR_QML="$QUICKSHELL_DIR/TopBar.qml"
+APP_LAUNCHER_QML="$QUICKSHELL_DIR/applauncher/appLauncher.qml"
+VOLUME_POPUP_QML="$QUICKSHELL_DIR/volume/VolumePopup.qml"
 
 install_addon() {
     local name="$1"
@@ -69,6 +71,9 @@ install_addon() {
     chmod +x "$dst/apply.sh" "$dst/apply.py"
     if [[ -f "$dst/zoomit.py" ]]; then
         chmod +x "$dst/zoomit.py"
+    fi
+    if [[ -f "$dst/loopback.py" ]]; then
+        chmod +x "$dst/loopback.py"
     fi
 }
 
@@ -111,6 +116,7 @@ run_apply() {
     SCREENSHOT_FREEZE_SETTINGS_POPUP="$SCREENSHOT_SETTINGS_POPUP" \
     MUSIC_PREVIEW_TOPBAR="$TOPBAR_QML" \
     MUSIC_VISUALIZER_SETTINGS_POPUP="$SCREENSHOT_SETTINGS_POPUP" \
+    HEADSET_MIC_VOLUME_POPUP="$VOLUME_POPUP_QML" \
     WALLPAPER_RANDOM_PICKER="$WALLPAPER_PICKER" \
     WALLPAPER_RANDOM_MANAGER="$QS_MANAGER" \
     "$@"
@@ -123,21 +129,23 @@ install_addon "zoomit"
 install_addon "screenshot-freeze"
 install_addon "idle-inhibit"
 install_addon "music-preview-rounded"
+install_addon "launcher-web-search"
+install_addon "headset-mic-loopback"
 install_systemd_units
 
 if user_systemctl daemon-reload; then
     if ! user_systemctl try-restart hypr-zoomit.service; then
         warn "could not refresh the ZoomIt zoom daemon"
     fi
-    if ! user_systemctl enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path; then
+    if ! user_systemctl enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path launcher-web-search-addon.path headset-mic-loopback-addon.path; then
         warn "could not enable addon watcher units"
-        echo "  run: systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path" >&2
+        echo "  run: systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path launcher-web-search-addon.path headset-mic-loopback-addon.path" >&2
     fi
 else
     warn "user systemd session is not available; units were installed but not enabled"
     echo "  after logging into a graphical session, run:" >&2
     echo "    systemctl --user daemon-reload" >&2
-    echo "    systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path" >&2
+    echo "    systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path launcher-web-search-addon.path headset-mic-loopback-addon.path" >&2
 fi
 
 patch_failures=0
@@ -225,6 +233,28 @@ else
         echo "  install the Hyprland dots first; the watcher will apply this addon later" >&2
         patch_failures=$((patch_failures + 1))
     fi
+
+    if [[ -f "$APP_LAUNCHER_QML" ]]; then
+        if ! run_apply LAUNCHER_WEB_SEARCH_APPLY_DELAY=0 LAUNCHER_WEB_SEARCH_QML="$APP_LAUNCHER_QML" "$ADDONS_DST/launcher-web-search/apply.sh"; then
+            warn "launcher-web-search patch failed"
+            patch_failures=$((patch_failures + 1))
+        fi
+    else
+        warn "Quickshell app launcher not found (expected $APP_LAUNCHER_QML)"
+        echo "  install the Hyprland/Quickshell dots first; the watcher will apply this addon later" >&2
+        patch_failures=$((patch_failures + 1))
+    fi
+
+    if [[ -f "$VOLUME_POPUP_QML" ]]; then
+        if ! run_apply HEADSET_MIC_LOOPBACK_APPLY_DELAY=0 "$ADDONS_DST/headset-mic-loopback/apply.sh"; then
+            warn "headset-mic-loopback patch failed"
+            patch_failures=$((patch_failures + 1))
+        fi
+    else
+        warn "Quickshell audio panel not found (expected $VOLUME_POPUP_QML)"
+        echo "  install the Hyprland/Quickshell dots first; the watcher will apply this addon later" >&2
+        patch_failures=$((patch_failures + 1))
+    fi
 fi
 
 compile_hypr_keybinds() {
@@ -253,4 +283,4 @@ if (( patch_failures > 0 )); then
     exit 0
 fi
 
-echo "Installed wallpaper-random, emoji-picker, matugen-vibrant, zoomit, screenshot-freeze, idle-inhibit and music-preview-rounded addons."
+echo "Installed wallpaper-random, emoji-picker, matugen-vibrant, zoomit, screenshot-freeze, idle-inhibit, music-preview-rounded, launcher-web-search and headset-mic-loopback addons."
