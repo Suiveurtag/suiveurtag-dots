@@ -15,8 +15,10 @@ Item {
     property real outlineProgress: 0.0
     property bool syntheticPressed: false
     property bool pointerActivationPending: false
+    property bool pointerPressAllowed: false
 
-    readonly property bool effectivePressed: effectEnabled && (pressed || syntheticPressed)
+    readonly property bool effectivePressed: effectEnabled
+        && ((pressed && pointerPressAllowed) || syntheticPressed)
     readonly property real visualScale: effectivePressed ? 0.91 : 1.0
     readonly property real pressOpacity: effectivePressed ? 0.58 : 0.0
 
@@ -25,12 +27,14 @@ Item {
 
     onPressedChanged: {
         if (pressed) {
+            pointerPressAllowed = !active;
             pointerActivationPending = true;
             pointerActivationGuard.stop();
             shortcutPress.stop();
             syntheticPressed = false;
-        } else if (pointerActivationPending) {
-            pointerActivationGuard.restart();
+        } else {
+            pointerPressAllowed = false;
+            if (pointerActivationPending) pointerActivationGuard.restart();
         }
     }
 
@@ -39,8 +43,11 @@ Item {
         if (pointerActivationPending) {
             pointerActivationPending = false;
             pointerActivationGuard.stop();
-        } else {
+        } else if (active) {
             shortcutPress.restart();
+        } else {
+            shortcutPress.stop();
+            syntheticPressed = false;
         }
         if (active) {
             outlineExit.stop();
