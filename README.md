@@ -11,6 +11,7 @@ This repo currently contains:
 - `screenshot-freeze`: optional Windows-style frozen screen while selecting a screenshot region
 - `idle-inhibit`: optional switch that disables automatic idle locking and suspension
 - `music-preview-rounded`: rounded album artwork and an optional CAVA visualizer in the Quickshell top bar
+- `topbar-button-effects`: optional press feedback and animated Matugen outlines for active top bar panels
 - `launcher-web-search`: press `Tab` in the app launcher to search the typed text with Zen
 - `headset-mic-loopback`: expose the current headset output as a selectable virtual microphone
 - `captive-portal`: detects Wi-Fi networks that still need a browser login and adds an "Open Login Page" action to the network popup
@@ -26,24 +27,44 @@ These addons are designed to stay isolated from the upstream dots:
 
 - `addons/`: addon source files copied into `~/.local/share/quickshell-addons`
 - `systemd/user/`: watcher units copied into `~/.config/systemd/user`
-- `install.sh`: installs or refreshes both addons
+- `install.sh`: bootstraps ilyamiro's dots, then installs or refreshes every addon
+- `scripts/install-addons.sh`: internal idempotent addon deployment used by `install.sh`
 
 ## Install
 
-Run:
+On Arch Linux or a supported Arch derivative, copy and paste this single command:
 
 ```bash
-./install.sh
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/Suiveurtag/suiveurtag-dots/main/install.sh)"
 ```
 
 What it does:
 
+- downloads this repository into a temporary directory when launched from the command above
+- checks the distribution, user session, and required bootstrap commands
+- downloads and runs [ilyamiro's official imperative-dots installer](https://github.com/ilyamiro/imperative-dots) when the base dots are missing
+- skips the upstream installer when a working installation is already present
 - copies all addons into `~/.local/share/quickshell-addons`
 - copies the user systemd units into `~/.config/systemd/user`
 - enables and starts the watcher path units
 - preserves current-wallpaper detection for filenames containing spaces
 - runs each patcher immediately
-- reloads Hyprland so the generated keybind file is refreshed
+- refreshes the generated Hyprland configuration, force-reloads borders, animations and keyboard layouts, then reloads the running Quickshell instance
+- displays the current stage and reports the failing command, step, and likely cause when something goes wrong
+
+The installer is safe to run again to refresh the addons. To run it from a cloned checkout:
+
+```bash
+./install.sh
+```
+
+Useful options:
+
+- `--force-dots`: rerun ilyamiro's installer even when the base dots are detected
+- `--skip-dots`: apply only the Suiveurtag addons
+- `--no-color`: disable colored output
+
+The upstream ilyamiro installer is interactive, may request `sudo`, supports Arch Linux and its derivatives, and announces anonymous telemetry in its own README.
 
 ## Notes
 
@@ -54,6 +75,7 @@ What it does:
 - Vibrant Matugen colors are opt-in under **Settings → Addons**. Enabling the option uses Matugen's vibrant scheme for Quickshell and maps the image-derived Base16 accents to the full UI palette with a small saturation boost.
 - Frozen screenshot selection is enabled by default under **Settings → Addons → Freeze screen during selection**. It freezes regional screenshots, including edit mode, while full-screen screenshots remain instant and screen recording stays live.
 - The CAVA music visualizer is opt-in under **Settings → Addons → Music visualizer**. It replaces the previous/play/next buttons with a smooth Matugen-colored spectrum; click the spectrum to play or pause.
+- **Settings → Addons → Animated top bar buttons** is enabled by default. Mouse presses shrink and gray the button briefly; opening a panel by mouse or shortcut keeps a flowing Matugen gradient around its matching top bar button.
 - **Settings → Addons → Disable idle sleep and lock** stops `hypridle` immediately and removes it from startup. Turning the option off restores the daemon; manual locking and suspension remain available.
 - The Matugen addon saves the latest upstream Quickshell color template before overriding it. Disabling the option restores that template, and the watcher repeats the process after dots updates.
 - ZoomIt-style shortcuts are added to **Settings → Keybinds** and can be edited there:
