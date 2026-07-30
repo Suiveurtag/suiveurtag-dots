@@ -1,4 +1,7 @@
 singleton AlarmManager 1.0 AlarmManager.qml
 AlarmView 1.0 AlarmView.qml
+ClockDial 1.0 ClockDial.qml
+LiquidBackground 1.0 LiquidBackground.qml
+OneUiClock 1.0 OneUiClock.qml
 RingingOverlay 1.0 RingingOverlay.qml
 SoundSettings 1.0 SoundSettings.qml

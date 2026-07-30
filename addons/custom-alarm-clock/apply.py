@@ -35,6 +35,9 @@ SETTINGS_PATH = XDG_STATE_HOME / "quickshell/custom-alarm-clock/settings.json"
 MODULE_FILES = (
     "AlarmManager.qml",
     "AlarmView.qml",
+    "ClockDial.qml",
+    "LiquidBackground.qml",
+    "OneUiClock.qml",
     "RingingOverlay.qml",
     "SoundSettings.qml",
     "qmldir",
@@ -222,6 +225,22 @@ def patch_timer(text: str) -> str:
 
     api_body = """property var modeLabels: ["Timer", "Stopwatch", "Pomodoro", "Alarm"]
 property alias alarmActiveMode: stateCache.activeMode
+property alias clockTimerRemainingMs: stateCache.timerRemainingMs
+property alias clockTimerPresetMs: stateCache.timerPresetMs
+property alias clockStopwatchMs: stopwatchView.currentDisplayMs
+property alias clockPomodoroRemainingMs: stateCache.pomoRemainingMs
+property alias clockPomodoroState: stateCache.pomoState
+property alias clockPomodoroSessions: stateCache.pomoSessionsCount
+property alias clockPomodoroTargetSessions: stateCache.pomoTargetSessions
+property alias clockPomodoroWorkLimit: stateCache.pomoWorkLimit
+property alias clockPomodoroShortLimit: stateCache.pomoShortBreakLimit
+property alias clockPomodoroLongLimit: stateCache.pomoLongBreakLimit
+readonly property bool clockTimerRunning: stateCache.timerTargetEpoch > 0
+readonly property bool clockTimerIdle: !clockTimerRunning
+    && stateCache.timerRemainingMs === stateCache.timerPresetMs
+readonly property bool clockStopwatchRunning: stateCache.swStartEpoch > 0
+readonly property bool clockPomodoroRunning: stateCache.pomoTargetEpoch > 0
+readonly property var clockLapData: root.swLapData
 
 function activeModeKey() {
     if (stateCache.activeMode === 1) return "stopwatch";
@@ -231,11 +250,93 @@ function activeModeKey() {
 }
 
 function alarmModalOpen() {
-    return alarmSoundSettings.visible || AlarmSystem.AlarmManager.isRinging;
+    return alarmSoundSettings.visible
+        || AlarmSystem.AlarmManager.isRinging
+        || oneUiClock.alarmEditorOpen;
 }
 
 function openAlarmSoundSettings() {
     alarmSoundSettings.openFor(activeModeKey());
+}
+
+function clockSetMode(mode) {
+    stateCache.activeMode = Math.max(0, Math.min(3, Number(mode)));
+}
+
+function clockToggle() {
+    root.toggleActiveTabState();
+}
+
+function clockSetTimerPreset(milliseconds) {
+    const value = Math.max(0, Math.min(99 * 3600000 + 59 * 60000 + 59000, Math.round(milliseconds)));
+    stateCache.timerTargetEpoch = 0;
+    stateCache.timerPresetMs = value;
+    stateCache.timerRemainingMs = value;
+}
+
+function clockAdjustTimerSegment(segment, direction) {
+    let hours = Math.floor(stateCache.timerPresetMs / 3600000);
+    let minutes = Math.floor((stateCache.timerPresetMs % 3600000) / 60000);
+    let seconds = Math.floor((stateCache.timerPresetMs % 60000) / 1000);
+    if (segment === 0) {
+        hours = (hours + direction + 100) % 100;
+    } else if (segment === 1) {
+        minutes = (minutes + direction + 60) % 60;
+    } else {
+        seconds = (seconds + direction + 60) % 60;
+    }
+    clockSetTimerPreset((hours * 3600 + minutes * 60 + seconds) * 1000);
+}
+
+function clockResetTimer() {
+    stateCache.timerTargetEpoch = 0;
+    stateCache.timerRemainingMs = stateCache.timerPresetMs;
+}
+
+function clockStopwatchSecondary() {
+    if (stateCache.swStartEpoch > 0) {
+        const nowMs = stopwatchView.currentDisplayMs;
+        const lastMs = root.swLapData.length > 0
+            ? root.swLapData[root.swLapData.length - 1].total
+            : 0;
+        const updated = root.swLapData.slice();
+        updated.push({ total: nowMs, diff: nowMs - lastMs });
+        root.swLapData = updated;
+        return;
+    }
+    stateCache.swStartEpoch = 0;
+    stateCache.swAccumulatedMs = 0;
+    stateCache.swAlarmTriggered = false;
+    root.swLapData = [];
+    stopwatchView.currentDisplayMs = 0;
+}
+
+function clockSkipPomodoro() {
+    stateCache.pomoTargetEpoch = 0;
+    const phase = stateCache.pomoState;
+    root.notify(
+        "Pomodoro Skipped",
+        phase === 0
+            ? "Focus session skipped. Moving to break."
+            : "Break skipped. Moving back to focus.",
+        "media-skip-forward"
+    );
+    pomodoroView.handleSessionComplete();
+}
+
+function clockAdjustPomodoro(target, delta, minimum, maximum) {
+    const next = Math.max(minimum, Math.min(maximum, Number(stateCache[target]) + delta));
+    stateCache[target] = next;
+    if (target === "pomoTargetSessions")
+        stateCache.pomoSessionsCount = Math.min(stateCache.pomoSessionsCount, next - 1);
+    if (stateCache.pomoTargetEpoch > 0)
+        return;
+    if (target === "pomoWorkLimit" && stateCache.pomoState === 0)
+        stateCache.pomoRemainingMs = next * 60000;
+    else if (target === "pomoShortBreakLimit" && stateCache.pomoState === 1)
+        stateCache.pomoRemainingMs = next * 60000;
+    else if (target === "pomoLongBreakLimit" && stateCache.pomoState === 2)
+        stateCache.pomoRemainingMs = next * 60000;
 }"""
     api_block = marker_block(API_BEGIN, API_END, api_body, "    ")
     _, notify_closing = find_function(text, "notify")
@@ -251,7 +352,7 @@ function openAlarmSoundSettings() {
     toggle_guard_block = marker_block(
         TOGGLE_GUARD_BEGIN,
         TOGGLE_GUARD_END,
-        "if (root.alarmModalOpen()) return;",
+        "if (alarmSoundSettings.visible || AlarmSystem.AlarmManager.isRinging) return;",
         "        ",
     )
     text = insert_after_line(
@@ -266,7 +367,7 @@ function openAlarmSoundSettings() {
         TOGGLE_BEGIN,
         TOGGLE_END,
         """else if (stateCache.activeMode === 3) {
-    alarmView.commitEditor();
+    oneUiClock.commitAlarmEditor();
 }""",
         "        ",
     )
@@ -412,43 +513,39 @@ function openAlarmSoundSettings() {
     matched = re.sub(r"width:\s*root\.s\((?:280|300)\)", "width: root.s(300)", matched, count=1)
     text = text[:width_start] + matched + text[width_end:]
 
-    controls_body = """Rectangle {
-    id: alarmSoundButton
-    anchors.top: parent.top
-    anchors.topMargin: root.s(18)
-    anchors.right: parent.right
-    anchors.rightMargin: root.s(10)
-    width: root.s(28)
-    height: width
-    radius: root.s(8)
-    color: soundButtonMouse.containsMouse ? root.cSurface1 : root.cSurface0
-    border.width: 1
-    border.color: AlarmSystem.AlarmManager.soundFor(root.activeModeKey()).source !== ""
-        ? root.cMauve
-        : root.cSurface1
-    z: 20
-
-    Text {
-        anchors.centerIn: parent
-        text: AlarmSystem.AlarmManager.isRinging ? "\\uF04D" : "\\uF001"
-        color: AlarmSystem.AlarmManager.isRinging ? root.cMauve : root.cText
-        font.family: root.iconFont
-        font.pixelSize: root.s(11)
-    }
-
-    MouseArea {
-        id: soundButtonMouse
-        anchors.fill: parent
-        hoverEnabled: true
-        cursorShape: Qt.PointingHandCursor
-        onClicked: {
-            if (AlarmSystem.AlarmManager.isRinging) {
-                AlarmSystem.AlarmManager.stopPlayback(true);
-            } else {
-                root.openAlarmSoundSettings();
-            }
-        }
-    }
+    controls_body = """AlarmSystem.OneUiClock {
+    id: oneUiClock
+    anchors.fill: parent
+    z: 100
+    controller: root
+    scaleFunc: root.s
+    baseColor: root.cBase
+    mantleColor: root.cMantle
+    surface0Color: root.cSurface0
+    surface1Color: root.cSurface1
+    surface2Color: typeof mochaColors !== "undefined" && mochaColors
+        ? mochaColors.surface2
+        : "#585b70"
+    textColor: root.cText
+    subtextColor: root.cSubtext0
+    accentColor: root.cMauve
+    blueColor: typeof mochaColors !== "undefined" && mochaColors
+        ? mochaColors.blue
+        : "#89b4fa"
+    sapphireColor: typeof mochaColors !== "undefined" && mochaColors
+        ? mochaColors.sapphire
+        : "#74c7ec"
+    pinkColor: typeof mochaColors !== "undefined" && mochaColors
+        ? mochaColors.pink
+        : "#f5c2e7"
+    greenColor: typeof mochaColors !== "undefined" && mochaColors
+        ? mochaColors.green
+        : "#a6e3a1"
+    redColor: typeof mochaColors !== "undefined" && mochaColors
+        ? mochaColors.red
+        : "#f38ba8"
+    iconFont: root.iconFont
+    animateBackground: root.widgetVisible
 }
 
 AlarmSystem.SoundSettings {

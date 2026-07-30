@@ -75,6 +75,7 @@ The upstream ilyamiro installer is interactive, may request `sudo`, supports Arc
 - In the app launcher, `Enter` still opens the selected application; `Tab` searches the typed text in a new Zen tab.
 - The floating Timer widget now includes an **Alarm** tab. Create one-time or daily alarms, enable or remove them, and use the music-note button to choose a separate WAV, OGG, MP3, FLAC, M4A, AAC, or Opus sound and volume for Timer, Stopwatch, Pomodoro, and Alarm.
 - Stopwatch alarms are tied to an optional count-up target. Open its sound settings, choose the target in one-minute steps, and enable it; scheduled alarms can be snoozed for five minutes or dismissed while ringing.
+- Timer, Stopwatch, Pomodoro, and Alarm share a One UI-inspired clock layout with circular controls, a floating bottom navigation pill, state morphs, and slowly drifting background lights sourced from the current Matugen palette.
 - Alarm settings are stored under `~/.local/state/quickshell/custom-alarm-clock/`. The shared player and scheduler are singletons, so multi-monitor sessions produce one alarm rather than one per monitor.
 - In the audio panel's **Streams** tab, **Headset audio as microphone** creates a `Headset Audio` input from the current output. Select that input in Discord, OBS, or another recording app; turning the option off removes it.
 - Vibrant Matugen colors are opt-in under **Settings → Addons**. Enabling the option uses Matugen's vibrant scheme for Quickshell and maps the image-derived Base16 accents to the full UI palette with a small saturation boost.
