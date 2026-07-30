@@ -25,11 +25,17 @@ NETWORK_POPUP = QS_DIR / "network/NetworkPopup.qml"
 NETWORK_DIR = NETWORK_POPUP.parent
 BACKUP_DIR = ADDON_DIR / "backups"
 
+IMPORT_BLOCK = """// BEGIN user-addon: speedtest import
+import "." as SpeedtestComponents
+// END user-addon: speedtest import
+"""
+
 STATE_BLOCK = """    // BEGIN user-addon: speedtest state
     property bool showSpeedtestPanel: false
     property string speedtestState: "idle"
     property string speedtestPhase: "idle"
     property real speedtestProgress: 0.0
+    property real speedtestVisualMbps: 0.0
     property string speedtestLive: "0"
     property string speedtestDownload: ""
     property string speedtestUpload: ""
@@ -39,6 +45,13 @@ STATE_BLOCK = """    // BEGIN user-addon: speedtest state
     property string speedtestMessage: ""
     readonly property bool speedtestRunning: window.speedtestState === "running"
     readonly property string speedtestStatusFile: window.cacheDir + "/native-speedtest.json"
+
+    Behavior on speedtestProgress {
+        NumberAnimation { duration: 700; easing.type: Easing.OutQuint }
+    }
+    Behavior on speedtestVisualMbps {
+        NumberAnimation { duration: 920; easing.type: Easing.OutQuint }
+    }
 
     function speedtestShellQuote(value) {
         let safe = String(value === undefined || value === null ? "" : value);
@@ -50,9 +63,15 @@ STATE_BLOCK = """    // BEGIN user-addon: speedtest state
         window.showSpeedtestPanel = true;
         window.speedtestState = "running";
         window.speedtestPhase = "latency";
-        window.speedtestProgress = 0.02;
+        window.speedtestProgress = 0.01;
+        window.speedtestVisualMbps = 0;
         window.speedtestLive = "0";
-        window.speedtestMessage = "Testing latency";
+        window.speedtestDownload = "";
+        window.speedtestUpload = "";
+        window.speedtestLatency = "";
+        window.speedtestServer = "Cloudflare";
+        window.speedtestSummary = "";
+        window.speedtestMessage = "Preparing latency samples";
         Quickshell.execDetached(["bash", "-c", "rm -f " + window.speedtestShellQuote(window.speedtestStatusFile)]);
         nativeSpeedtestProcess.running = true;
         speedtestStatusTimer.restart();
@@ -64,14 +83,20 @@ STATE_BLOCK = """    // BEGIN user-addon: speedtest state
             let data = JSON.parse(textData);
             window.speedtestState = data.status || window.speedtestState;
             window.speedtestPhase = data.phase || window.speedtestPhase;
-            window.speedtestProgress = Math.max(0, Math.min(1, Number(data.progress || window.speedtestProgress)));
-            window.speedtestLive = data.live_mbps || window.speedtestLive;
-            window.speedtestDownload = data.download_mbps || window.speedtestDownload;
-            window.speedtestUpload = data.upload_mbps || window.speedtestUpload;
-            window.speedtestLatency = data.latency_ms || window.speedtestLatency;
-            window.speedtestServer = data.server || window.speedtestServer;
-            window.speedtestSummary = data.summary || window.speedtestSummary;
-            window.speedtestMessage = data.message || window.speedtestMessage;
+            if (data.progress !== undefined) {
+                window.speedtestProgress = Math.max(0, Math.min(1, Number(data.progress)));
+            }
+            if (data.live_mbps !== undefined && data.live_mbps !== "") {
+                window.speedtestLive = String(data.live_mbps);
+                let visualValue = Number(data.live_mbps);
+                if (!isNaN(visualValue)) window.speedtestVisualMbps = Math.max(0, visualValue);
+            }
+            if (data.download_mbps !== undefined) window.speedtestDownload = String(data.download_mbps);
+            if (data.upload_mbps !== undefined) window.speedtestUpload = String(data.upload_mbps);
+            if (data.latency_ms !== undefined) window.speedtestLatency = String(data.latency_ms);
+            if (data.server) window.speedtestServer = data.server;
+            if (data.summary !== undefined) window.speedtestSummary = String(data.summary);
+            if (data.message !== undefined) window.speedtestMessage = String(data.message);
         } catch(e) {}
     }
 
@@ -99,7 +124,7 @@ STATE_BLOCK = """    // BEGIN user-addon: speedtest state
 
     Timer {
         id: speedtestStatusTimer
-        interval: 450
+        interval: 250
         running: window.showSpeedtestPanel && window.speedtestRunning
         repeat: true
         onTriggered: {
@@ -385,6 +410,18 @@ SPEEDTEST_PANEL_BLOCK = """            // BEGIN user-addon: speedtest panel
 
 """
 
+SPEEDTEST_COMPONENT_BLOCK = """            // BEGIN user-addon: speedtest panel
+            SpeedtestComponents.SpeedtestPanel {
+                id: speedtestPanel
+                rootWindow: window
+                anchors.fill: parent
+                anchors.margins: window.s(18)
+                anchors.bottomMargin: window.s(86)
+            }
+            // END user-addon: speedtest panel
+
+"""
+
 SPEEDTEST_BUTTON_BLOCK = """            // BEGIN user-addon: speedtest button
             Item {
                 id: speedtestButtonContainer
@@ -532,11 +569,18 @@ def validate_qml(path: Path) -> None:
 
 def install_assets() -> bool:
     changed = False
-    for name in ("native_speedtest.sh", "speed-alt-svgrepo-com.svg"):
+    for name in (
+        "native_speedtest.sh",
+        "speed-alt-svgrepo-com.svg",
+        "loading-svgrepo-com.svg",
+        "SpeedtestPanel.qml",
+    ):
         source = ADDON_DIR / name
         target = NETWORK_DIR / name
         if not source.is_file():
             raise PatchError(f"missing addon asset: {source}")
+        if name.endswith(".qml"):
+            validate_qml(source)
         if target.is_file() and target.read_bytes() == source.read_bytes():
             continue
         shutil.copy2(source, target)
@@ -577,6 +621,12 @@ def remove_marked_item(text: str, marker: str) -> str:
 
 
 def patch_popup(text: str) -> str:
+    if "BEGIN user-addon: speedtest import" not in text:
+        anchor = 'import "../"\n'
+        if anchor not in text:
+            raise PatchError("network component import anchor not found")
+        text = text.replace(anchor, anchor + IMPORT_BLOCK, 1)
+
     text = replace_marked_block(text, "speedtest", STATE_BLOCK)
     text = remove_marked_item(text, "speedtest panel")
     text = remove_marked_item(text, "speedtest button")
@@ -594,7 +644,7 @@ def patch_popup(text: str) -> str:
         anchor = "            Rectangle {\n                id: bottomTabsContainer\n"
         if anchor not in text:
             raise PatchError("bottom tabs anchor not found")
-        text = text.replace(anchor, SPEEDTEST_PANEL_BLOCK + anchor, 1)
+        text = text.replace(anchor, SPEEDTEST_COMPONENT_BLOCK + anchor, 1)
 
     if "BEGIN user-addon: speedtest button" not in text:
         anchor = "            Item {\n                id: powerToggleContainer\n"
@@ -616,7 +666,7 @@ def main() -> int:
     assets_changed = install_assets()
 
     if patched != original:
-        tmp_path = ADDON_DIR / ".NetworkPopup.qml.preview"
+        tmp_path = NETWORK_DIR / ".NetworkPopup.qml.speedtest-preview"
         atomic_write(tmp_path, patched)
         try:
             validate_qml(tmp_path)
