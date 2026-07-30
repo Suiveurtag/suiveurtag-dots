@@ -1,0 +1,7 @@
+[Unit]
+Description=Reapply smooth scrolling to long Wi-Fi panel text
+After=captive-portal-addon.service speedtest-addon.service
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/share/quickshell-addons/wifi-text-scroll/apply.sh

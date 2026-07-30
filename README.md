@@ -18,6 +18,7 @@ This repo currently contains:
 - `captive-portal`: detects Wi-Fi networks that still need a browser login and adds an "Open Login Page" action to the network popup
 - `speedtest`: native network-panel speedtest with a separate button, live progress UI, and Cloudflare endpoint measurements
 - `loading-icon`: shared white SVG loader used across wallpaper, updater, movies, network actions, and speedtest
+- `wifi-text-scroll`: smoothly scrolls a long active Wi-Fi name inside the network panel
 
 These addons are designed to stay isolated from the upstream dots:
 
@@ -93,4 +94,5 @@ The upstream ilyamiro installer is interactive, may request `sudo`, supports Arc
 - Custom ZoomIt key combinations selected in **Settings → Keybinds** are preserved by the addon watcher; defaults are only recreated when an addon entry is missing.
 - The captive portal addon uses `nmcli` for connectivity state and `curl` to discover the login redirect URL when a hotspot requires web authentication.
 - The speedtest addon uses `curl` against Cloudflare's `speed.cloudflare.com` download/upload endpoints and shows live download/upload progress, latency, and final results in its own Matugen-styled network panel view.
+- A long active Wi-Fi name scrolls automatically and continuously in the panel's central connection circle; other network cards, Ethernet, Bluetooth, and the top bar keep their original text behavior.
 - If you pull new upstream dots later, the path units should reapply the addons automatically.
