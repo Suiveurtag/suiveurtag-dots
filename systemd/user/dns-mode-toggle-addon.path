@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch the Quickshell network panel for the DNS mode toggle
+
+[Path]
+PathChanged=%h/.config/hypr/scripts/quickshell/network/NetworkPopup.qml
+Unit=dns-mode-toggle-addon.service
+
+[Install]
+WantedBy=default.target

@@ -164,21 +164,22 @@ install_addon "captive-portal"
 install_addon "speedtest"
 install_addon "loading-icon"
 install_addon "wifi-text-scroll"
+install_addon "dns-mode-toggle"
 install_systemd_units
 
 if user_systemctl daemon-reload; then
     if ! user_systemctl try-restart hypr-zoomit.service; then
         warn "could not refresh the ZoomIt zoom daemon"
     fi
-    if ! user_systemctl enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path topbar-button-effects-addon.path launcher-web-search-addon.path custom-alarm-clock-addon.path headset-mic-loopback-addon.path captive-portal-addon.path speedtest-addon.path loading-icon-addon.path wifi-text-scroll-addon.path; then
+    if ! user_systemctl enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path topbar-button-effects-addon.path launcher-web-search-addon.path custom-alarm-clock-addon.path headset-mic-loopback-addon.path captive-portal-addon.path speedtest-addon.path loading-icon-addon.path wifi-text-scroll-addon.path dns-mode-toggle-addon.path; then
         warn "could not enable addon watcher units"
-        echo "  run: systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path topbar-button-effects-addon.path launcher-web-search-addon.path custom-alarm-clock-addon.path headset-mic-loopback-addon.path captive-portal-addon.path speedtest-addon.path loading-icon-addon.path wifi-text-scroll-addon.path" >&2
+        echo "  run: systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path topbar-button-effects-addon.path launcher-web-search-addon.path custom-alarm-clock-addon.path headset-mic-loopback-addon.path captive-portal-addon.path speedtest-addon.path loading-icon-addon.path wifi-text-scroll-addon.path dns-mode-toggle-addon.path" >&2
     fi
 else
     warn "user systemd session is not available; units were installed but not enabled"
     echo "  after logging into a graphical session, run:" >&2
     echo "    systemctl --user daemon-reload" >&2
-    echo "    systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path topbar-button-effects-addon.path launcher-web-search-addon.path custom-alarm-clock-addon.path headset-mic-loopback-addon.path captive-portal-addon.path speedtest-addon.path loading-icon-addon.path wifi-text-scroll-addon.path" >&2
+    echo "    systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path topbar-button-effects-addon.path launcher-web-search-addon.path custom-alarm-clock-addon.path headset-mic-loopback-addon.path captive-portal-addon.path speedtest-addon.path loading-icon-addon.path wifi-text-scroll-addon.path dns-mode-toggle-addon.path" >&2
 fi
 
 patch_failures=0
@@ -328,10 +329,14 @@ else
             warn "wifi-text-scroll patch failed"
             patch_failures=$((patch_failures + 1))
         fi
+        if ! run_apply DNS_MODE_TOGGLE_APPLY_DELAY=0 "$ADDONS_DST/dns-mode-toggle/apply.sh"; then
+            warn "dns-mode-toggle patch failed"
+            patch_failures=$((patch_failures + 1))
+        fi
     else
         warn "Quickshell network panel not found (expected $NETWORK_POPUP_QML)"
         echo "  install the Hyprland/Quickshell dots first; the watchers will apply these addons later" >&2
-        patch_failures=$((patch_failures + 4))
+        patch_failures=$((patch_failures + 5))
     fi
 fi
 
@@ -374,4 +379,4 @@ if (( patch_failures > 0 )); then
     exit 1
 fi
 
-echo "Installed wallpaper-random, emoji-picker, matugen-vibrant, zoomit, screenshot-freeze, idle-inhibit, music-preview-rounded, topbar-button-effects, launcher-web-search, custom-alarm-clock, headset-mic-loopback, captive-portal, speedtest, loading-icon and wifi-text-scroll addons."
+echo "Installed wallpaper-random, emoji-picker, matugen-vibrant, zoomit, screenshot-freeze, idle-inhibit, music-preview-rounded, topbar-button-effects, launcher-web-search, custom-alarm-clock, headset-mic-loopback, captive-portal, speedtest, loading-icon, wifi-text-scroll and dns-mode-toggle addons."
