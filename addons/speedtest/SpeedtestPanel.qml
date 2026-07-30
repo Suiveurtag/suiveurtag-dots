@@ -692,7 +692,7 @@ Rectangle {
                     Image {
                         anchors.fill: parent
                         visible: panel.running
-                        source: Qt.resolvedUrl("loading-svgrepo-com.svg")
+                        source: Qt.resolvedUrl("../loading-svgrepo-com.svg")
                         sourceSize: Qt.size(64, 64)
                         fillMode: Image.PreserveAspectFit
                         smooth: true

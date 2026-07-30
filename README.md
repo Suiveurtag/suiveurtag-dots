@@ -16,6 +16,7 @@ This repo currently contains:
 - `headset-mic-loopback`: expose the current headset output as a selectable virtual microphone
 - `captive-portal`: detects Wi-Fi networks that still need a browser login and adds an "Open Login Page" action to the network popup
 - `speedtest`: native network-panel speedtest with a separate button, live progress UI, and Cloudflare endpoint measurements
+- `loading-icon`: shared white SVG loader used across wallpaper, updater, movies, network actions, and speedtest
 
 These addons are designed to stay isolated from the upstream dots:
 

@@ -159,21 +159,22 @@ install_addon "launcher-web-search"
 install_addon "headset-mic-loopback"
 install_addon "captive-portal"
 install_addon "speedtest"
+install_addon "loading-icon"
 install_systemd_units
 
 if user_systemctl daemon-reload; then
     if ! user_systemctl try-restart hypr-zoomit.service; then
         warn "could not refresh the ZoomIt zoom daemon"
     fi
-    if ! user_systemctl enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path topbar-button-effects-addon.path launcher-web-search-addon.path headset-mic-loopback-addon.path captive-portal-addon.path speedtest-addon.path; then
+    if ! user_systemctl enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path topbar-button-effects-addon.path launcher-web-search-addon.path headset-mic-loopback-addon.path captive-portal-addon.path speedtest-addon.path loading-icon-addon.path; then
         warn "could not enable addon watcher units"
-        echo "  run: systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path topbar-button-effects-addon.path launcher-web-search-addon.path headset-mic-loopback-addon.path captive-portal-addon.path speedtest-addon.path" >&2
+        echo "  run: systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path topbar-button-effects-addon.path launcher-web-search-addon.path headset-mic-loopback-addon.path captive-portal-addon.path speedtest-addon.path loading-icon-addon.path" >&2
     fi
 else
     warn "user systemd session is not available; units were installed but not enabled"
     echo "  after logging into a graphical session, run:" >&2
     echo "    systemctl --user daemon-reload" >&2
-    echo "    systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path topbar-button-effects-addon.path launcher-web-search-addon.path headset-mic-loopback-addon.path captive-portal-addon.path speedtest-addon.path" >&2
+    echo "    systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path topbar-button-effects-addon.path launcher-web-search-addon.path headset-mic-loopback-addon.path captive-portal-addon.path speedtest-addon.path loading-icon-addon.path" >&2
 fi
 
 patch_failures=0
@@ -304,10 +305,14 @@ else
             warn "speedtest patch failed"
             patch_failures=$((patch_failures + 1))
         fi
+        if ! run_apply LOADING_ICON_APPLY_DELAY=0 "$ADDONS_DST/loading-icon/apply.sh"; then
+            warn "loading-icon patch failed"
+            patch_failures=$((patch_failures + 1))
+        fi
     else
         warn "Quickshell network panel not found (expected $NETWORK_POPUP_QML)"
         echo "  install the Hyprland/Quickshell dots first; the watchers will apply these addons later" >&2
-        patch_failures=$((patch_failures + 2))
+        patch_failures=$((patch_failures + 3))
     fi
 fi
 
@@ -350,4 +355,4 @@ if (( patch_failures > 0 )); then
     exit 1
 fi
 
-echo "Installed wallpaper-random, emoji-picker, matugen-vibrant, zoomit, screenshot-freeze, idle-inhibit, music-preview-rounded, topbar-button-effects, launcher-web-search, headset-mic-loopback, captive-portal and speedtest addons."
+echo "Installed wallpaper-random, emoji-picker, matugen-vibrant, zoomit, screenshot-freeze, idle-inhibit, music-preview-rounded, topbar-button-effects, launcher-web-search, headset-mic-loopback, captive-portal, speedtest and loading-icon addons."

@@ -572,7 +572,6 @@ def install_assets() -> bool:
     for name in (
         "native_speedtest.sh",
         "speed-alt-svgrepo-com.svg",
-        "loading-svgrepo-com.svg",
         "SpeedtestPanel.qml",
     ):
         source = ADDON_DIR / name
