@@ -46,9 +46,12 @@ POPUP_MARKERS = (
 )
 SCRIPT_BEGIN = "# BEGIN user-addon: screenshot-freeze launch"
 SCRIPT_END = "# END user-addon: screenshot-freeze launch"
+SCRIPT_CAPTURE_BEGIN = "# BEGIN user-addon: screenshot-freeze frozen capture"
+SCRIPT_CAPTURE_END = "# END user-addon: screenshot-freeze frozen capture"
 OVERLAY_MARKERS = (
     "screenshot-freeze state",
     "screenshot-freeze background",
+    "screenshot-freeze process",
     "screenshot-freeze capture",
 )
 
@@ -122,6 +125,17 @@ def find_matching_brace(text: str, opening: int) -> int:
                 return index
         index += 1
     raise PatchError("unbalanced QML braces")
+
+
+def replace_marked_block(text: str, begin: str, end: str, replacement: str) -> str:
+    start = text.find(begin)
+    finish = text.find(end)
+    if start < 0 and finish < 0:
+        raise PatchError(f"missing patch markers: {begin}")
+    if start < 0 or finish < start:
+        raise PatchError(f"partial patch markers: {begin}")
+    finish += len(end)
+    return text[:start] + replacement + text[finish:]
 
 
 def patch_settings_popup(text: str) -> str:
@@ -218,24 +232,24 @@ def patch_settings_popup(text: str) -> str:
 
 
 def patch_screenshot_script(text: str) -> str:
-    if SCRIPT_BEGIN in text:
-        if SCRIPT_END not in text:
-            raise PatchError("partial screenshot shell patch detected")
-        return text
     required = re.search(r'REQUIRED_CMDS=\((?P<body>[^\n]*)\)', text)
     if not required:
         raise PatchError("screenshot dependency list not found")
     body = required.group("body")
-    if '"jq"' not in body:
-        body += ' "jq"'
-        text = text[: required.start("body")] + body + text[required.end("body") :]
+    for command in ("jq", "magick"):
+        if f'"{command}"' not in body:
+            body += f' "{command}"'
+    text = text[: required.start("body")] + body + text[required.end("body") :]
+
     launch = 'quickshell -p "$QML_PATH"'
-    if text.count(launch) != 1:
-        raise PatchError("screenshot overlay launch anchor not found")
-    block = f'''{SCRIPT_BEGIN}
+    launch_block = f'''{SCRIPT_BEGIN}
 FREEZE_SETTINGS="${{HYPR_SETTINGS:-${{XDG_CONFIG_HOME:-$HOME/.config}}/hypr/settings.json}}"
 export QS_SCREENSHOT_FREEZE="false"
 export QS_SCREENSHOT_FROZEN_IMAGE=""
+export QS_SCREENSHOT_FROZEN_X=""
+export QS_SCREENSHOT_FROZEN_Y=""
+export QS_SCREENSHOT_FROZEN_WIDTH=""
+export QS_SCREENSHOT_FROZEN_HEIGHT=""
 
 if jq -e '.freezeScreenshotSelection == true' "$FREEZE_SETTINGS" >/dev/null 2>&1; then
     QS_SCREENSHOT_FROZEN_IMAGE=$(mktemp "$QS_RUN_SCREENSHOT/frozen-screen.XXXXXX.png")
@@ -244,15 +258,22 @@ if jq -e '.freezeScreenshotSelection == true' "$FREEZE_SETTINGS" >/dev/null 2>&1
 
     CURSOR_X=$(hyprctl cursorpos -j | jq -r '.x')
     CURSOR_Y=$(hyprctl cursorpos -j | jq -r '.y')
-    QS_SCREENSHOT_FROZEN_OUTPUT=$(hyprctl monitors -j | jq -r \
+    QS_SCREENSHOT_FROZEN_MONITOR=$(hyprctl monitors -j | jq -c \
         --argjson cursorX "$CURSOR_X" --argjson cursorY "$CURSOR_Y" \
-        'first(.[] | select($cursorX >= .x and $cursorX < (.x + (.width / .scale)) and $cursorY >= .y and $cursorY < (.y + (.height / .scale))) | .name) // empty')
-    if [[ -z "$QS_SCREENSHOT_FROZEN_OUTPUT" ]]; then
-        QS_SCREENSHOT_FROZEN_OUTPUT=$(hyprctl monitors -j | jq -r 'first(.[] | select(.focused) | .name) // empty')
-    fi
-    export QS_SCREENSHOT_FROZEN_OUTPUT
+        'def logicalWidth: if ((.transform // 0) % 2) == 1 then (.height / .scale) else (.width / .scale) end;
+         def logicalHeight: if ((.transform // 0) % 2) == 1 then (.width / .scale) else (.height / .scale) end;
+         first(.[] | select($cursorX >= .x and $cursorX < (.x + logicalWidth) and $cursorY >= .y and $cursorY < (.y + logicalHeight)))
+         // first(.[] | select(.focused)) // empty')
+    QS_SCREENSHOT_FROZEN_OUTPUT=$(jq -r '.name // empty' <<< "$QS_SCREENSHOT_FROZEN_MONITOR")
 
     if [[ -n "$QS_SCREENSHOT_FROZEN_OUTPUT" ]] && grim -o "$QS_SCREENSHOT_FROZEN_OUTPUT" "$QS_SCREENSHOT_FROZEN_IMAGE"; then
+        QS_SCREENSHOT_FROZEN_X=$(jq -r '.x' <<< "$QS_SCREENSHOT_FROZEN_MONITOR")
+        QS_SCREENSHOT_FROZEN_Y=$(jq -r '.y' <<< "$QS_SCREENSHOT_FROZEN_MONITOR")
+        QS_SCREENSHOT_FROZEN_WIDTH=$(jq -r 'if ((.transform // 0) % 2) == 1 then (.height / .scale) else (.width / .scale) end' <<< "$QS_SCREENSHOT_FROZEN_MONITOR")
+        QS_SCREENSHOT_FROZEN_HEIGHT=$(jq -r 'if ((.transform // 0) % 2) == 1 then (.width / .scale) else (.height / .scale) end' <<< "$QS_SCREENSHOT_FROZEN_MONITOR")
+        export QS_SCREENSHOT_FROZEN_OUTPUT
+        export QS_SCREENSHOT_FROZEN_X QS_SCREENSHOT_FROZEN_Y
+        export QS_SCREENSHOT_FROZEN_WIDTH QS_SCREENSHOT_FROZEN_HEIGHT
         export QS_SCREENSHOT_FREEZE="true"
     else
         rm -f "$QS_SCREENSHOT_FROZEN_IMAGE"
@@ -262,46 +283,121 @@ fi
 
 {launch}
 {SCRIPT_END}'''
-    return text.replace(launch, block)
+
+    launch_present = SCRIPT_BEGIN in text or SCRIPT_END in text
+    if launch_present:
+        text = replace_marked_block(text, SCRIPT_BEGIN, SCRIPT_END, launch_block)
+    else:
+        if text.count(launch) != 1:
+            raise PatchError("screenshot overlay launch anchor not found")
+        text = text.replace(launch, launch_block)
+
+    original_capture = '''    # Mode: Screenshot
+    GRIM_CMD="grim -"
+    [ -n "$GEOMETRY" ] && GRIM_CMD="grim -g \\"$GEOMETRY\\" -"
+
+    if [ "$EDIT_MODE" = true ]; then
+        eval $GRIM_CMD | GSK_RENDERER=gl satty --filename - --output-filename "$FILENAME" --init-tool brush --copy-command wl-copy
+    else
+        eval $GRIM_CMD | tee "$FILENAME" | wl-copy
+    fi'''
+    frozen_capture = f'''    {SCRIPT_CAPTURE_BEGIN}
+    CAPTURE_CMD=(grim)
+    if [[ "${{QS_SCREENSHOT_FREEZE:-false}}" == "true" && "$RECORD_MODE" != "true" ]]; then
+        if [[ ! -s "${{QS_SCREENSHOT_FROZEN_IMAGE:-}}" ||
+              ! "$GEOMETRY" =~ ^(-?[0-9]+),(-?[0-9]+)[[:space:]]+([0-9]+)x([0-9]+)$ ||
+              -z "${{QS_SCREENSHOT_FROZEN_X:-}}" ||
+              -z "${{QS_SCREENSHOT_FROZEN_Y:-}}" ||
+              -z "${{QS_SCREENSHOT_FROZEN_WIDTH:-}}" ||
+              -z "${{QS_SCREENSHOT_FROZEN_HEIGHT:-}}" ]]; then
+            notify-send -u critical -a "Screenshot System" "Frozen screenshot failed" "The static source image or its geometry is unavailable."
+            exit 1
+        fi
+
+        GEOMETRY_X="${{BASH_REMATCH[1]}}"
+        GEOMETRY_Y="${{BASH_REMATCH[2]}}"
+        GEOMETRY_WIDTH="${{BASH_REMATCH[3]}}"
+        GEOMETRY_HEIGHT="${{BASH_REMATCH[4]}}"
+        read -r FROZEN_IMAGE_WIDTH FROZEN_IMAGE_HEIGHT < <(
+            magick identify -format '%w %h' "$QS_SCREENSHOT_FROZEN_IMAGE"
+        )
+        read -r CROP_X CROP_Y CROP_WIDTH CROP_HEIGHT < <(
+            python3 - "$GEOMETRY_X" "$GEOMETRY_Y" "$GEOMETRY_WIDTH" "$GEOMETRY_HEIGHT" \
+                "$QS_SCREENSHOT_FROZEN_X" "$QS_SCREENSHOT_FROZEN_Y" \
+                "$QS_SCREENSHOT_FROZEN_WIDTH" "$QS_SCREENSHOT_FROZEN_HEIGHT" \
+                "$FROZEN_IMAGE_WIDTH" "$FROZEN_IMAGE_HEIGHT" <<'PY'
+import sys
+
+gx, gy, gw, gh, mx, my, mw, mh, iw, ih = map(float, sys.argv[1:])
+x = round((gx - mx) * iw / mw)
+y = round((gy - my) * ih / mh)
+w = max(1, round(gw * iw / mw))
+h = max(1, round(gh * ih / mh))
+x = min(max(0, x), max(0, round(iw) - 1))
+y = min(max(0, y), max(0, round(ih) - 1))
+w = min(w, round(iw) - x)
+h = min(h, round(ih) - y)
+print(x, y, w, h)
+PY
+        )
+        CAPTURE_CMD=(magick "$QS_SCREENSHOT_FROZEN_IMAGE" -crop "${{CROP_WIDTH}}x${{CROP_HEIGHT}}+${{CROP_X}}+${{CROP_Y}}" +repage png:-)
+    elif [ -n "$GEOMETRY" ]; then
+        CAPTURE_CMD=(grim -g "$GEOMETRY")
+    fi
+
+    if [ "$EDIT_MODE" = true ]; then
+        "${{CAPTURE_CMD[@]}}" | GSK_RENDERER=gl satty --filename - --output-filename "$FILENAME" --init-tool brush --copy-command wl-copy
+    else
+        "${{CAPTURE_CMD[@]}}" | tee "$FILENAME" | wl-copy
+    fi
+    {SCRIPT_CAPTURE_END}'''
+
+    capture_present = SCRIPT_CAPTURE_BEGIN in text or SCRIPT_CAPTURE_END in text
+    if capture_present:
+        return replace_marked_block(
+            text, SCRIPT_CAPTURE_BEGIN, SCRIPT_CAPTURE_END, frozen_capture.strip()
+        )
+    if text.count(original_capture) != 1:
+        raise PatchError("screenshot capture command anchor not found")
+    return text.replace(original_capture, frozen_capture)
 
 
 def patch_overlay(text: str) -> str:
-    present = [name for name in OVERLAY_MARKERS if f"BEGIN user-addon: {name}" in text]
-    if present:
-        if len(present) != len(OVERLAY_MARKERS):
-            raise PatchError("partial screenshot overlay patch detected")
-        return text
-
     screen_anchor = "    screen: Quickshell.cursorScreen"
-    if text.count(screen_anchor) != 1:
-        raise PatchError("screenshot overlay screen anchor not found")
-    screen_block = '''    function requestedScreen() {
-        const output = Quickshell.env("QS_SCREENSHOT_FROZEN_OUTPUT") || "";
-        for (let index = 0; index < Quickshell.screens.length; index++) {
-            if (Quickshell.screens[index].name === output) return Quickshell.screens[index];
+    if screen_anchor in text:
+        if text.count(screen_anchor) != 1:
+            raise PatchError("screenshot overlay screen anchor not found")
+        screen_block = '''    function requestedScreen() {
+            const output = Quickshell.env("QS_SCREENSHOT_FROZEN_OUTPUT") || "";
+            for (let index = 0; index < Quickshell.screens.length; index++) {
+                if (Quickshell.screens[index].name === output) return Quickshell.screens[index];
+            }
+            return Quickshell.cursorScreen;
         }
-        return Quickshell.cursorScreen;
-    }
-    screen: requestedScreen()'''
-    text = text.replace(screen_anchor, screen_block)
+        screen: requestedScreen()'''
+        text = text.replace(screen_anchor, screen_block)
+    elif "screen: requestedScreen()" not in text:
+        raise PatchError("screenshot overlay screen anchor not found")
 
-    edit_anchor = re.search(r'(?m)^(?P<indent>\s*)property bool isEditMode: Quickshell\.env\("QS_SCREENSHOT_EDIT"\) === "true"\s*$', text)
-    if not edit_anchor:
-        raise PatchError("screenshot overlay state anchor not found")
-    indent = edit_anchor.group("indent")
-    state = (
-        f"\n{indent}// BEGIN user-addon: screenshot-freeze state\n"
-        f'{indent}property bool freezeActive: Quickshell.env("QS_SCREENSHOT_FREEZE") === "true"\n'
-        f'{indent}property string frozenImagePath: Quickshell.env("QS_SCREENSHOT_FROZEN_IMAGE") || ""\n'
-        f"{indent}property bool captureInProgress: false\n"
-        f"{indent}// END user-addon: screenshot-freeze state"
-    )
-    text = text[: edit_anchor.end()] + state + text[edit_anchor.end() :]
+    state = '''// BEGIN user-addon: screenshot-freeze state
+    property bool freezeActive: Quickshell.env("QS_SCREENSHOT_FREEZE") === "true"
+    property string frozenImagePath: Quickshell.env("QS_SCREENSHOT_FROZEN_IMAGE") || ""
+    // END user-addon: screenshot-freeze state'''
+    if "BEGIN user-addon: screenshot-freeze state" in text:
+        text = replace_marked_block(
+            text,
+            "// BEGIN user-addon: screenshot-freeze state",
+            "// END user-addon: screenshot-freeze state",
+            state,
+        )
+    else:
+        edit_anchor = re.search(r'(?m)^(?P<indent>\s*)property bool isEditMode: Quickshell\.env\("QS_SCREENSHOT_EDIT"\) === "true"\s*$', text)
+        if not edit_anchor:
+            raise PatchError("screenshot overlay state anchor not found")
+        text = text[: edit_anchor.end()] + "\n\n    " + state + text[edit_anchor.end() :]
 
     background_anchor = re.search(r"(?m)^\s*property string cachedMode:", text)
-    if not background_anchor:
-        raise PatchError("screenshot overlay background anchor not found")
-    background = '''    // BEGIN user-addon: screenshot-freeze background
+    background = '''// BEGIN user-addon: screenshot-freeze background
     Image {
         id: frozenBackground
         anchors.fill: parent
@@ -310,23 +406,78 @@ def patch_overlay(text: str) -> str:
         cache: false
         smooth: true
         visible: root.freezeActive && !root.isVideoMode
-        z: root.captureInProgress ? 1000 : -1
+        z: -1
         onStatusChanged: if (status === Image.Error) root.freezeActive = false
     }
     // END user-addon: screenshot-freeze background
 
 '''
-    text = text[: background_anchor.start()] + background + text[background_anchor.start() :]
+    if "BEGIN user-addon: screenshot-freeze background" in text:
+        text = replace_marked_block(
+            text,
+            "// BEGIN user-addon: screenshot-freeze background",
+            "// END user-addon: screenshot-freeze background",
+            background.rstrip(),
+        )
+    else:
+        if not background_anchor:
+            raise PatchError("screenshot overlay background anchor not found")
+        text = text[: background_anchor.start()] + "    " + background + text[background_anchor.start() :]
+
+    process = '''// BEGIN user-addon: screenshot-freeze process
+    Process {
+        id: captureProcess
+        command: ["bash", "-c", captureTimer.pendingCmd]
+        onExited: Qt.quit()
+    }
+
+    Timer {
+        id: captureTimer
+        property string pendingCmd: ""
+        interval: 200
+        repeat: false
+        onTriggered: captureProcess.running = true
+    }
+    // END user-addon: screenshot-freeze process'''
+    if "BEGIN user-addon: screenshot-freeze process" in text:
+        text = replace_marked_block(
+            text,
+            "// BEGIN user-addon: screenshot-freeze process",
+            "// END user-addon: screenshot-freeze process",
+            process,
+        )
+    else:
+        original_timer = '''Timer {
+        id: captureTimer
+        property string pendingCmd: ""
+        interval: 200
+        repeat: false
+        onTriggered: {
+            Quickshell.execDetached(["bash", "-c", pendingCmd])
+            Qt.quit()
+        }
+    }'''
+        if text.count(original_timer) != 1:
+            raise PatchError("screenshot capture timer anchor not found")
+        text = text.replace(original_timer, process)
 
     old = '''        root.visible = false
         captureTimer.pendingCmd = cmd
         captureTimer.start()'''
+    capture = '''// BEGIN user-addon: screenshot-freeze capture
+        root.visible = false
+        // END user-addon: screenshot-freeze capture'''
+    if "BEGIN user-addon: screenshot-freeze capture" in text:
+        text = replace_marked_block(
+            text,
+            "// BEGIN user-addon: screenshot-freeze capture",
+            "// END user-addon: screenshot-freeze capture",
+            capture,
+        )
+        return text
     if text.count(old) != 1:
         raise PatchError("screenshot capture execution anchor not found")
-    new = '''        // BEGIN user-addon: screenshot-freeze capture
-        if (root.freezeActive && !isRecord) root.captureInProgress = true
-        else root.visible = false
-        // END user-addon: screenshot-freeze capture
+    new = f'''        {capture}
         captureTimer.pendingCmd = cmd
         captureTimer.start()'''
     return text.replace(old, new)
@@ -420,7 +571,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    for command in ("grim", "jq", "qmllint"):
+    for command in ("grim", "jq", "magick", "qmllint"):
         if not shutil.which(command):
             raise PatchError(f"missing required command: {command}")
     LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
