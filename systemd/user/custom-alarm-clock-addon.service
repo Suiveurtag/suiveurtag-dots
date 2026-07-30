@@ -1,0 +1,6 @@
+[Unit]
+Description=Reapply custom sounds and alarms to the Quickshell Timer widget
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/share/quickshell-addons/custom-alarm-clock/apply.sh

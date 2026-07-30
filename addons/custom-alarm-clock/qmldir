@@ -1,0 +1,4 @@
+singleton AlarmManager 1.0 AlarmManager.qml
+AlarmView 1.0 AlarmView.qml
+RingingOverlay 1.0 RingingOverlay.qml
+SoundSettings 1.0 SoundSettings.qml
