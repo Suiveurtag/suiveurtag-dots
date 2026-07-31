@@ -159,7 +159,7 @@ def reload_quickshell() -> None:
 
 
 def main() -> int:
-    for command in ("nmcli", "jq", "flock"):
+    for command in ("nmcli", "jq", "flock", "resolvectl"):
         if not shutil.which(command):
             raise PatchError(f"missing required command: {command}")
 

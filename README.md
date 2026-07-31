@@ -96,5 +96,5 @@ The upstream ilyamiro installer is interactive, may request `sudo`, supports Arc
 - The captive portal addon uses `nmcli` for connectivity state and `curl` to discover the login redirect URL when a hotspot requires web authentication.
 - The speedtest addon uses `curl` against Cloudflare's `speed.cloudflare.com` download/upload endpoints and shows live download/upload progress, latency, and final results in its own Matugen-styled network panel view.
 - A long active Wi-Fi name scrolls automatically and continuously in the panel's central connection circle; other network cards, Ethernet, Bluetooth, and the top bar keep their original text behavior.
-- The Wi-Fi panel DNS toggle preserves the current mode during installation. **Maison** clears manual DNS and uses the DHCP-provided resolvers; **Mullvad** applies only `194.242.2.2` and `2a07:e340::2` to the active Wi-Fi profile through NetworkManager.
+- The Wi-Fi panel DNS toggle preserves the current mode during installation. **Maison** clears manual DNS and uses the DHCP-provided resolvers; **Mullvad** applies `194.242.2.2` and `2a07:e340::2` over authenticated DNS-over-TLS (`dns.mullvad.net`) only to the active Wi-Fi profile through NetworkManager.
 - If you pull new upstream dots later, the path units should reapply the addons automatically.

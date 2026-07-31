@@ -3,6 +3,9 @@ set -euo pipefail
 
 readonly MULLVAD_IPV4="194.242.2.2"
 readonly MULLVAD_IPV6="2a07:e340::2"
+readonly MULLVAD_HOSTNAME="dns.mullvad.net"
+readonly MULLVAD_IPV4_DOT="${MULLVAD_IPV4}#${MULLVAD_HOSTNAME}"
+readonly MULLVAD_IPV6_DOT="${MULLVAD_IPV6}#${MULLVAD_HOSTNAME}"
 readonly ACTION="${1:-status}"
 readonly REQUESTED_MODE="${2:-}"
 readonly LOCK_PATH="${XDG_RUNTIME_DIR:-/tmp}/quickshell-dns-mode-toggle.lock"
@@ -43,6 +46,7 @@ fail() {
 
 command -v nmcli >/dev/null 2>&1 || fail "NetworkManager (nmcli) est introuvable"
 command -v jq >/dev/null 2>&1 || fail "jq est introuvable"
+command -v resolvectl >/dev/null 2>&1 || fail "systemd-resolved (resolvectl) est introuvable"
 
 exec 9>"$LOCK_PATH"
 flock 9
@@ -64,22 +68,25 @@ connection_uuid="${general[1]:-}"
 read_dns_settings() {
     mapfile -t dns_settings < <(
         nmcli --escape no \
-            -g ipv4.ignore-auto-dns,ipv4.dns,ipv6.ignore-auto-dns,ipv6.dns \
+            -g connection.dns-over-tls,ipv4.ignore-auto-dns,ipv4.dns,ipv6.ignore-auto-dns,ipv6.dns \
             connection show uuid "$connection_uuid"
     )
-    ignore_ipv4="${dns_settings[0]:-no}"
-    dns_ipv4="${dns_settings[1]:-}"
-    ignore_ipv6="${dns_settings[2]:-no}"
-    dns_ipv6="${dns_settings[3]:-}"
+    dns_over_tls="${dns_settings[0]:--1}"
+    ignore_ipv4="${dns_settings[1]:-no}"
+    dns_ipv4="${dns_settings[2]:-}"
+    ignore_ipv6="${dns_settings[3]:-no}"
+    dns_ipv6="${dns_settings[4]:-}"
 }
 
 detect_mode() {
-    if [[ "$ignore_ipv4" == "yes" && "$ignore_ipv6" == "yes" \
-        && ",$dns_ipv4," == *",$MULLVAD_IPV4,"* \
-        && ",$dns_ipv6," == *",$MULLVAD_IPV6,"* ]]; then
+    if [[ ( "$dns_over_tls" == "yes" || "$dns_over_tls" == "2" ) \
+        && "$ignore_ipv4" == "yes" && "$ignore_ipv6" == "yes" \
+        && ",$dns_ipv4," == *",$MULLVAD_IPV4_DOT,"* \
+        && ",$dns_ipv6," == *",$MULLVAD_IPV6_DOT,"* ]]; then
         printf 'mullvad'
     elif [[ "$ignore_ipv4" == "no" && "$ignore_ipv6" == "no" \
-        && -z "$dns_ipv4" && -z "$dns_ipv6" ]]; then
+        && -z "$dns_ipv4" && -z "$dns_ipv6" \
+        && "$dns_over_tls" != "yes" && "$dns_over_tls" != "2" ]]; then
         printf 'home'
     else
         printf 'custom'
@@ -106,15 +113,36 @@ old_ignore_ipv4="$ignore_ipv4"
 old_dns_ipv4="$dns_ipv4"
 old_ignore_ipv6="$ignore_ipv6"
 old_dns_ipv6="$dns_ipv6"
+old_dns_over_tls="$dns_over_tls"
+
+case "$old_dns_over_tls" in
+    -1) old_dns_over_tls_value="default" ;;
+    0) old_dns_over_tls_value="no" ;;
+    1) old_dns_over_tls_value="opportunistic" ;;
+    2) old_dns_over_tls_value="yes" ;;
+    *) old_dns_over_tls_value="$old_dns_over_tls" ;;
+esac
+
+restore_previous_settings() {
+    nmcli connection modify uuid "$connection_uuid" \
+        connection.dns-over-tls "$old_dns_over_tls_value" \
+        ipv4.ignore-auto-dns "$old_ignore_ipv4" \
+        ipv4.dns "$old_dns_ipv4" \
+        ipv6.ignore-auto-dns "$old_ignore_ipv6" \
+        ipv6.dns "$old_dns_ipv6" >/dev/null 2>&1 || true
+    nmcli device reapply "$wifi_device" >/dev/null 2>&1 || true
+}
 
 if [[ "$target_mode" == "mullvad" ]]; then
     nmcli connection modify uuid "$connection_uuid" \
+        connection.dns-over-tls yes \
         ipv4.ignore-auto-dns yes \
-        ipv4.dns "$MULLVAD_IPV4" \
+        ipv4.dns "$MULLVAD_IPV4_DOT" \
         ipv6.ignore-auto-dns yes \
-        ipv6.dns "$MULLVAD_IPV6"
+        ipv6.dns "$MULLVAD_IPV6_DOT"
 else
     nmcli connection modify uuid "$connection_uuid" \
+        connection.dns-over-tls default \
         ipv4.ignore-auto-dns no \
         ipv4.dns "" \
         ipv6.ignore-auto-dns no \
@@ -123,22 +151,38 @@ fi
 
 if ! nmcli device reapply "$wifi_device" >/dev/null 2>&1 \
     && ! nmcli connection up uuid "$connection_uuid" ifname "$wifi_device" >/dev/null 2>&1; then
-    nmcli connection modify uuid "$connection_uuid" \
-        ipv4.ignore-auto-dns "$old_ignore_ipv4" \
-        ipv4.dns "$old_dns_ipv4" \
-        ipv6.ignore-auto-dns "$old_ignore_ipv6" \
-        ipv6.dns "$old_dns_ipv6" >/dev/null 2>&1 || true
-    nmcli device reapply "$wifi_device" >/dev/null 2>&1 || true
+    restore_previous_settings
     fail "NetworkManager n'a pas pu appliquer le nouveau DNS" "$connection_name" "$wifi_device"
 fi
 
 read_dns_settings
 applied_mode="$(detect_mode)"
 if [[ "$applied_mode" != "$target_mode" ]]; then
+    restore_previous_settings
     fail "Le profil Wi-Fi n'a pas conservé le mode DNS demandé" "$connection_name" "$wifi_device"
 fi
 
+if [[ "$target_mode" == "mullvad" ]]; then
+    resolution_ok=false
+    for _ in 1 2 3; do
+        if resolvectl status "$wifi_device" 2>/dev/null | grep -Fq '+DNSOverTLS' \
+            && timeout 4s resolvectl query \
+                --cache=no \
+                --stale-data=no \
+                --legend=no \
+                example.com >/dev/null 2>&1; then
+            resolution_ok=true
+            break
+        fi
+        sleep 0.2
+    done
+    if [[ "$resolution_ok" != "true" ]]; then
+        restore_previous_settings
+        fail "Le DNS-over-TLS Mullvad ne répond pas; mode précédent restauré" "$connection_name" "$wifi_device"
+    fi
+fi
+
 message="$([[ "$target_mode" == "mullvad" ]] \
-    && printf 'DNS Mullvad appliqués à cette connexion Wi-Fi' \
+    && printf 'DNS-over-TLS Mullvad actif sur cette connexion Wi-Fi' \
     || printf 'DNS automatiques DHCP réactivés')"
 emit_json "ok" "$applied_mode" "$connection_name" "$wifi_device" "$message"
