@@ -35,6 +35,7 @@ SETTINGS_PATH = XDG_STATE_HOME / "quickshell/custom-alarm-clock/settings.json"
 MODULE_FILES = (
     "AlarmManager.qml",
     "AlarmView.qml",
+    "AnimatedNumberWheel.qml",
     "ClockDial.qml",
     "LiquidBackground.qml",
     "OneUiClock.qml",
@@ -44,7 +45,7 @@ MODULE_FILES = (
 )
 
 DEFAULT_SETTINGS = {
-    "version": 1,
+    "version": 2,
     "sounds": {
         mode: {"source": "", "volume": 85}
         for mode in ("timer", "stopwatch", "pomodoro", "alarm")
@@ -723,7 +724,30 @@ def normalized_settings(value: object) -> dict:
     result["stopwatchTargetMs"] = max(1000, min(99 * 3600000, target))
     result["stopwatchEnabled"] = value.get("stopwatchEnabled") is True
     if isinstance(value.get("alarms"), list):
-        result["alarms"] = value["alarms"]
+        alarms = []
+        for index, alarm in enumerate(value["alarms"]):
+            if not isinstance(alarm, dict):
+                continue
+            try:
+                hour = max(0, min(23, int(alarm.get("hour", 0))))
+                minute = max(0, min(59, int(alarm.get("minute", 0))))
+            except (TypeError, ValueError):
+                continue
+            repeat = "daily" if alarm.get("repeat") == "daily" else "once"
+            date = str(alarm.get("date", "")) if repeat == "once" else ""
+            if date and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+                date = ""
+            alarms.append({
+                "id": str(alarm.get("id", f"migrated-{index}")),
+                "hour": hour,
+                "minute": minute,
+                "label": str(alarm.get("label", "Alarm"))[:80] or "Alarm",
+                "enabled": alarm.get("enabled") is True,
+                "repeat": repeat,
+                "date": date,
+                "lastFired": str(alarm.get("lastFired", "")),
+            })
+        result["alarms"] = alarms
     return result
 
 

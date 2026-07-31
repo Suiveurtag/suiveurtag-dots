@@ -20,9 +20,13 @@ Item {
     property string iconFont: "Font Awesome 6 Free Solid"
     property int pendingVolume: 85
     property int pendingTargetMs: 5 * 60 * 1000
+    property bool opened: false
 
-    visible: false
+    visible: opened || opacity > 0.001
+    opacity: opened ? 1 : 0
     z: 200
+
+    Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
 
     function s(value) {
         return typeof scaleFunc === "function" ? scaleFunc(value) : value;
@@ -32,14 +36,14 @@ Item {
         mode = selectedMode;
         pendingVolume = AlarmSystem.AlarmManager.soundFor(mode).volume;
         pendingTargetMs = AlarmSystem.AlarmManager.stopwatchTargetMs;
-        visible = true;
+        opened = true;
     }
 
     function close() {
         if (AlarmSystem.AlarmManager.isPreviewing) {
             AlarmSystem.AlarmManager.stopPlayback(false);
         }
-        visible = false;
+        opened = false;
     }
 
     function updateVolumeAt(positionX, totalWidth) {
@@ -67,6 +71,10 @@ Item {
         color: accented ? root.accentColor : (buttonMouse.containsMouse ? root.surface1Color : root.surface0Color)
         border.width: accented ? 0 : 1
         border.color: root.surface1Color
+        scale: buttonMouse.pressed ? 0.94 : 1
+
+        Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutBack } }
+        Behavior on color { ColorAnimation { duration: 180 } }
 
         Text {
             anchors.centerIn: parent
@@ -105,7 +113,9 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: "#99000000"
+        color: root.opened ? "#99000000" : "#00000000"
+
+        Behavior on color { ColorAnimation { duration: 220 } }
 
         MouseArea {
             anchors.fill: parent
@@ -122,6 +132,13 @@ Item {
         color: root.mantleColor
         border.width: 1
         border.color: root.surface1Color
+        opacity: root.opened ? 1 : 0
+        scale: root.opened ? 1 : 0.82
+
+        Behavior on opacity { NumberAnimation { duration: 240 } }
+        Behavior on scale {
+            NumberAnimation { duration: 380; easing.type: Easing.OutBack }
+        }
 
         MouseArea {
             anchors.fill: parent
@@ -161,6 +178,9 @@ Item {
                     height: width
                     radius: root.s(8)
                     color: closeMouse.containsMouse ? root.surface1Color : "transparent"
+                    scale: closeMouse.pressed ? 0.84 : 1
+
+                    Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutBack } }
 
                     Text {
                         anchors.centerIn: parent

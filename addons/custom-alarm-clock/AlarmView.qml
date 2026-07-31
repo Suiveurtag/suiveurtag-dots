@@ -19,6 +19,7 @@ Item {
     property int editorHour: 7
     property int editorMinute: 0
     property bool editorDaily: false
+    property string editorDate: ""
     property string editingId: ""
     property bool editorOpen: false
 
@@ -30,11 +31,35 @@ Item {
         return Qt.rgba(color.r, color.g, color.b, amount);
     }
 
+    function dateKey(date) {
+        return date.getFullYear() + "-"
+            + String(date.getMonth() + 1).padStart(2, "0") + "-"
+            + String(date.getDate()).padStart(2, "0");
+    }
+
+    function dateFromKey(key) {
+        const pieces = String(key || "").split("-");
+        if (pieces.length !== 3) return new Date();
+        return new Date(Number(pieces[0]), Number(pieces[1]) - 1, Number(pieces[2]), 12, 0, 0, 0);
+    }
+
+    function shiftEditorDate(days) {
+        const shifted = dateFromKey(editorDate);
+        shifted.setDate(shifted.getDate() + days);
+        editorDate = dateKey(shifted);
+    }
+
+    function friendlyDate(key) {
+        if (!key) return "Next occurrence";
+        return Qt.formatDate(dateFromKey(key), "ddd d MMM yyyy");
+    }
+
     function resetEditor() {
         const next = new Date(Date.now() + 5 * 60000);
         editorHour = next.getHours();
         editorMinute = next.getMinutes();
         editorDaily = false;
+        editorDate = dateKey(next);
         editingId = "";
         labelInput.text = "";
     }
@@ -48,6 +73,7 @@ Item {
         editorHour = Number(alarm.hour);
         editorMinute = Number(alarm.minute);
         editorDaily = alarm.repeat === "daily";
+        editorDate = String(alarm.date || dateKey(new Date()));
         editingId = alarm.id;
         labelInput.text = alarm.label || "";
         editorOpen = true;
@@ -67,111 +93,32 @@ Item {
         const label = labelInput.text.trim() || "Alarm";
         const repeatMode = editorDaily ? "daily" : "once";
         if (editingId === "") {
-            AlarmSystem.AlarmManager.addAlarm(editorHour, editorMinute, label, repeatMode);
+            AlarmSystem.AlarmManager.addAlarm(
+                editorHour, editorMinute, label, repeatMode, editorDate
+            );
         } else {
             AlarmSystem.AlarmManager.updateAlarm(
                 editingId,
                 editorHour,
                 editorMinute,
                 label,
-                repeatMode
+                repeatMode,
+                editorDate
             );
         }
         closeEditor();
     }
 
-    component EditorStepper: Item {
-        id: stepper
-
-        property int value: 0
-        property int maximum: 59
-        property string label: ""
-        signal valueEdited(int newValue)
-
+    component EditorStepper: AnimatedNumberWheel {
         width: root.s(78)
-        height: root.s(108)
-
-        function wrapped(offset) {
-            const range = maximum + 1;
-            return (value + offset + range) % range;
-        }
-
-        Text {
-            anchors.top: parent.top
-            anchors.horizontalCenter: parent.horizontalCenter
-            text: stepper.label
-            color: root.alpha(root.subtextColor, 0.76)
-            font.family: "Noto Sans"
-            font.pixelSize: root.s(8)
-        }
-
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            y: root.s(20)
-            text: String(stepper.wrapped(-1)).padStart(2, "0")
-            color: root.alpha(root.subtextColor, 0.24)
-            font.family: "Noto Sans"
-            font.pixelSize: root.s(18)
-            font.weight: Font.DemiBold
-        }
-
-        Text {
-            id: editorCurrentText
-
-            anchors.centerIn: parent
-            anchors.verticalCenterOffset: root.s(7)
-            text: String(stepper.value).padStart(2, "0")
-            color: root.accentColor
-            font.family: "Noto Sans"
-            font.pixelSize: root.s(31)
-            font.weight: Font.Bold
-
-            SequentialAnimation {
-                id: editorValuePulse
-
-                NumberAnimation {
-                    target: editorCurrentText
-                    property: "scale"
-                    to: 0.88
-                    duration: 85
-                    easing.type: Easing.InCubic
-                }
-                NumberAnimation {
-                    target: editorCurrentText
-                    property: "scale"
-                    to: 1
-                    duration: 175
-                    easing.type: Easing.OutCubic
-                }
-            }
-        }
-
-        Text {
-            anchors.bottom: parent.bottom
-            anchors.horizontalCenter: parent.horizontalCenter
-            text: String(stepper.wrapped(1)).padStart(2, "0")
-            color: root.alpha(root.subtextColor, 0.24)
-            font.family: "Noto Sans"
-            font.pixelSize: root.s(18)
-            font.weight: Font.DemiBold
-        }
-
-        MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.PointingHandCursor
-            onClicked: mouse => {
-                if (mouse.y < stepper.height / 2)
-                    stepper.valueEdited(stepper.wrapped(-1));
-                else
-                    stepper.valueEdited(stepper.wrapped(1));
-            }
-            onWheel: wheel => {
-                stepper.valueEdited(stepper.wrapped(wheel.angleDelta.y > 0 ? 1 : -1));
-                wheel.accepted = true;
-            }
-        }
-
-        onValueChanged: editorValuePulse.restart()
+        height: root.s(112)
+        selected: true
+        scaleFunc: root.s
+        textColor: root.textColor
+        subtextColor: root.subtextColor
+        accentColor: root.accentColor
+        signal valueEdited(int newValue)
+        onDeltaRequested: delta => valueEdited(wrapped(value, delta))
     }
 
     component SmallIconButton: Rectangle {
@@ -314,6 +261,13 @@ Item {
                 }
             }
 
+            remove: Transition {
+                ParallelAnimation {
+                    NumberAnimation { property: "opacity"; to: 0; duration: 180 }
+                    NumberAnimation { property: "scale"; to: 0.88; duration: 210; easing.type: Easing.InCubic }
+                }
+            }
+
             displaced: Transition {
                 NumberAnimation {
                     properties: "x,y"
@@ -340,6 +294,7 @@ Item {
                     ? root.alpha(root.accentColor, 0.34)
                     : root.alpha(root.textColor, 0.07)
                 opacity: alarmItem.enabled === true ? 1 : 0.62
+                scale: alarmDelegateMouse.pressed ? 0.985 : 1
 
                 Behavior on opacity {
                     NumberAnimation { duration: 210 }
@@ -347,9 +302,14 @@ Item {
                 Behavior on color {
                     ColorAnimation { duration: 210 }
                 }
+                Behavior on scale {
+                    NumberAnimation { duration: 170; easing.type: Easing.OutCubic }
+                }
 
                 MouseArea {
+                    id: alarmDelegateMouse
                     anchors.fill: parent
+                    hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: root.editAlarm(alarmDelegate.alarmItem)
                 }
@@ -388,7 +348,7 @@ Item {
                         Text {
                             text: alarmDelegate.alarmItem.repeat === "daily"
                                 ? "Every day"
-                                : "Once"
+                                : root.friendlyDate(alarmDelegate.alarmItem.date)
                             color: root.subtextColor
                             font.family: "Noto Sans"
                             font.pixelSize: root.s(7)
@@ -430,6 +390,7 @@ Item {
                         }
 
                         MouseArea {
+                            id: toggleMouse
                             anchors.fill: parent
                             z: 3
                             cursorShape: Qt.PointingHandCursor
@@ -439,6 +400,11 @@ Item {
                                     alarmDelegate.alarmItem.id
                                 );
                             }
+                        }
+
+                        scale: toggleMouse.pressed ? 0.90 : 1
+                        Behavior on scale {
+                            NumberAnimation { duration: 150; easing.type: Easing.OutBack }
                         }
                     }
 
@@ -480,20 +446,21 @@ Item {
         Rectangle {
             id: editorSheet
 
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            height: Math.min(parent.height - root.s(2), root.s(260))
+            anchors.centerIn: parent
+            width: Math.min(parent.width - root.s(24), root.s(330))
+            height: Math.min(parent.height - root.s(18), root.s(root.editorDaily ? 286 : 326))
             radius: root.s(24)
             color: root.alpha(root.mantleColor, 0.98)
             border.width: 1
             border.color: root.alpha(root.textColor, 0.12)
-            y: root.editorOpen ? parent.height - height : parent.height + root.s(18)
+            opacity: root.editorOpen ? 1 : 0
+            scale: root.editorOpen ? 1 : 0.82
 
-            Behavior on y {
+            Behavior on opacity { NumberAnimation { duration: 240 } }
+            Behavior on scale {
                 NumberAnimation {
-                    duration: 300
-                    easing.type: Easing.OutCubic
+                    duration: 370
+                    easing.type: Easing.OutBack
                 }
             }
 
@@ -610,6 +577,12 @@ Item {
                         border.color: root.editorDaily
                             ? root.alpha(root.accentColor, 0.62)
                             : root.alpha(root.textColor, 0.08)
+                        scale: repeatMouse.pressed ? 0.91 : 1
+
+                        Behavior on color { ColorAnimation { duration: 220 } }
+                        Behavior on scale {
+                            NumberAnimation { duration: 160; easing.type: Easing.OutBack }
+                        }
 
                         Text {
                             anchors.centerIn: parent
@@ -621,10 +594,63 @@ Item {
                         }
 
                         MouseArea {
+                            id: repeatMouse
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
                             onClicked: root.editorDaily = !root.editorDaily
                         }
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: root.editorDaily ? 0 : root.s(34)
+                    visible: !root.editorDaily
+                    spacing: root.s(8)
+
+                    SmallIconButton {
+                        icon: "\uF053"
+                        onClicked: root.shiftEditorDate(-1)
+                    }
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        height: root.s(34)
+                        radius: height / 2
+                        color: root.alpha(root.surface0Color, 0.82)
+                        border.width: 1
+                        border.color: root.alpha(root.accentColor, 0.28)
+
+                        Row {
+                            anchors.centerIn: parent
+                            spacing: root.s(7)
+
+                            Text {
+                                text: "\uF073"
+                                color: root.accentColor
+                                font.family: root.iconFont
+                                font.pixelSize: root.s(9)
+                            }
+                            Text {
+                                text: root.friendlyDate(root.editorDate)
+                                color: root.textColor
+                                font.family: "Noto Sans"
+                                font.pixelSize: root.s(9)
+                                font.weight: Font.DemiBold
+
+                                Behavior on text {
+                                    SequentialAnimation {
+                                        NumberAnimation { target: parent; property: "opacity"; to: 0.35; duration: 70 }
+                                        NumberAnimation { target: parent; property: "opacity"; to: 1; duration: 150 }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    SmallIconButton {
+                        icon: "\uF054"
+                        onClicked: root.shiftEditorDate(1)
                     }
                 }
 
@@ -639,6 +665,8 @@ Item {
                         color: cancelMouse.containsMouse
                             ? root.alpha(root.surface1Color, 0.88)
                             : root.alpha(root.surface0Color, 0.74)
+                        scale: cancelMouse.pressed ? 0.95 : 1
+                        Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutBack } }
 
                         Text {
                             anchors.centerIn: parent
@@ -667,6 +695,8 @@ Item {
                             : root.alpha(root.accentColor, 0.38)
                         border.width: 1
                         border.color: root.alpha(root.accentColor, 0.62)
+                        scale: saveMouse.pressed ? 0.95 : 1
+                        Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutBack } }
 
                         Text {
                             anchors.centerIn: parent

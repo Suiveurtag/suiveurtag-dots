@@ -115,11 +115,18 @@ Item {
             + String(date.getDate()).padStart(2, "0");
     }
 
+    function dateFromKey(key) {
+        const parts = String(key || "").split("-");
+        if (parts.length !== 3) return null;
+        const parsed = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]), 12, 0, 0, 0);
+        return isNaN(parsed.getTime()) ? null : parsed;
+    }
+
     function newAlarmId() {
         return Date.now().toString(36) + "-" + Math.floor(Math.random() * 1679616).toString(36);
     }
 
-    function addAlarm(hour, minute, label, repeatMode) {
+    function addAlarm(hour, minute, label, repeatMode, alarmDate) {
         const updated = clone(alarms);
         updated.push({
             id: newAlarmId(),
@@ -128,13 +135,14 @@ Item {
             label: String(label || "Alarm").trim().slice(0, 80) || "Alarm",
             enabled: true,
             repeat: repeatMode === "daily" ? "daily" : "once",
+            date: repeatMode === "daily" ? "" : String(alarmDate || ""),
             lastFired: ""
         });
         settingsData.alarms = updated;
         settingsFile.writeAdapter();
     }
 
-    function updateAlarm(alarmId, hour, minute, label, repeatMode) {
+    function updateAlarm(alarmId, hour, minute, label, repeatMode, alarmDate) {
         const updated = clone(alarms);
         for (let index = 0; index < updated.length; index++) {
             if (updated[index].id !== alarmId) continue;
@@ -142,6 +150,7 @@ Item {
             updated[index].minute = Math.max(0, Math.min(59, Math.round(minute)));
             updated[index].label = String(label || "Alarm").trim().slice(0, 80) || "Alarm";
             updated[index].repeat = repeatMode === "daily" ? "daily" : "once";
+            updated[index].date = repeatMode === "daily" ? "" : String(alarmDate || "");
             updated[index].lastFired = "";
             settingsData.alarms = updated;
             settingsFile.writeAdapter();
@@ -177,21 +186,26 @@ Item {
         for (let index = 0; index < alarms.length; index++) {
             const alarm = alarms[index];
             if (alarm.enabled !== true) continue;
-            let candidate = new Date(
-                now.getFullYear(),
-                now.getMonth(),
-                now.getDate(),
-                Number(alarm.hour),
-                Number(alarm.minute),
-                0,
-                0
-            );
-            if (candidate.getTime() <= now.getTime()) {
-                candidate.setDate(candidate.getDate() + 1);
+            let candidate;
+            if (alarm.repeat !== "daily" && String(alarm.date || "") !== "") {
+                const exactDate = dateFromKey(alarm.date);
+                if (!exactDate) continue;
+                candidate = new Date(
+                    exactDate.getFullYear(), exactDate.getMonth(), exactDate.getDate(),
+                    Number(alarm.hour), Number(alarm.minute), 0, 0
+                );
+                if (candidate.getTime() <= now.getTime()) continue;
+            } else {
+                candidate = new Date(
+                    now.getFullYear(), now.getMonth(), now.getDate(),
+                    Number(alarm.hour), Number(alarm.minute), 0, 0
+                );
+                if (candidate.getTime() <= now.getTime()) candidate.setDate(candidate.getDate() + 1);
             }
             if (nextEpoch === 0 || candidate.getTime() < nextEpoch) {
                 nextEpoch = candidate.getTime();
-                nextLabel = formatClockTime(alarm.hour, alarm.minute) + " · " + alarm.label;
+                nextLabel = Qt.formatDate(candidate, "ddd d MMM") + " · "
+                    + formatClockTime(alarm.hour, alarm.minute) + " · " + alarm.label;
             }
         }
         return nextLabel;
@@ -285,7 +299,8 @@ Item {
             date.getHours(),
             date.getMinutes(),
             (ringingAlarmLabel || ringingTitle || "Alarm") + " (snoozed)",
-            "once"
+            "once",
+            dateKey(date)
         );
         stopPlayback(false);
     }
@@ -324,6 +339,9 @@ Item {
         for (let index = 0; index < updated.length; index++) {
             const alarm = updated[index];
             if (alarm.enabled !== true || alarm.lastFired === today) continue;
+            if (alarm.repeat !== "daily"
+                    && String(alarm.date || "") !== ""
+                    && String(alarm.date) !== today) continue;
             const scheduledEpoch = scheduledEpochFor(now, alarm);
             const crossed = scheduledEpoch > previousEpoch && scheduledEpoch <= nowEpoch;
             const currentMinute = now.getHours() === Number(alarm.hour)
@@ -385,7 +403,7 @@ Item {
 
         JsonAdapter {
             id: settingsData
-            property int version: 1
+            property int version: 2
             property var sounds: ({
                 timer: { source: "", volume: 85 },
                 stopwatch: { source: "", volume: 85 },

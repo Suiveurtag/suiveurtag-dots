@@ -52,10 +52,13 @@ Item {
     }
 
     Rectangle {
+        id: dialFace
+
         anchors.centerIn: parent
         width: parent.width - root.s(28)
         height: width
         radius: width / 2
+        z: 1
         border.width: 1
         border.color: root.alpha(root.textColor, 0.08)
         gradient: Gradient {
@@ -69,44 +72,13 @@ Item {
             }
         }
 
-        Column {
-            anchors.centerIn: parent
-            spacing: root.s(2)
-
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                visible: text !== ""
-                text: root.eyebrowText
-                color: root.subtextColor
-                font.family: "Noto Sans"
-                font.pixelSize: root.s(8)
-                font.weight: Font.Medium
-            }
-
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: root.mainText
-                color: root.textColor
-                font.family: "Noto Sans"
-                font.pixelSize: root.s(root.mainText.length > 9 ? 19 : 23)
-                font.weight: Font.Bold
-            }
-
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                visible: text !== ""
-                text: root.detailText
-                color: root.subtextColor
-                font.family: "Noto Sans"
-                font.pixelSize: root.s(8)
-            }
-        }
     }
 
     Item {
         anchors.fill: parent
         visible: root.handVisible
         rotation: root.handAngle
+        z: 2
 
         Behavior on rotation {
             enabled: Math.abs(root.handAngle) < 0.001
@@ -126,9 +98,44 @@ Item {
         }
     }
 
+    Column {
+        anchors.centerIn: parent
+        spacing: root.s(2)
+        z: 3
+
+        Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            visible: text !== ""
+            text: root.eyebrowText
+            color: root.subtextColor
+            font.family: "Noto Sans"
+            font.pixelSize: root.s(8)
+            font.weight: Font.Medium
+        }
+
+        Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: root.mainText
+            color: root.textColor
+            font.family: "Noto Sans"
+            font.pixelSize: root.s(root.mainText.length > 9 ? 19 : 23)
+            font.weight: Font.Bold
+        }
+
+        Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            visible: text !== ""
+            text: root.detailText
+            color: root.subtextColor
+            font.family: "Noto Sans"
+            font.pixelSize: root.s(8)
+        }
+    }
+
     Rectangle {
         anchors.centerIn: parent
         visible: root.handVisible
+        z: 4
         width: root.s(6)
         height: width
         radius: width / 2

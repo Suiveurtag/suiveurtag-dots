@@ -23,6 +23,8 @@ Item {
     property color redColor: "#f38ba8"
     property string iconFont: "Font Awesome 6 Free Solid"
     property bool animateBackground: true
+    readonly property bool verticalMode: height > width * 1.18
+    readonly property real interfaceScale: verticalMode ? 1.16 : 1.06
 
     readonly property int activeMode: controller ? controller.alarmActiveMode : 0
     readonly property bool timerRunning: controller ? controller.clockTimerRunning : false
@@ -48,7 +50,8 @@ Item {
     property int transitionDirection: 1
 
     function s(value) {
-        return typeof scaleFunc === "function" ? scaleFunc(value) : value;
+        const scaled = typeof scaleFunc === "function" ? scaleFunc(value) : value;
+        return scaled * interfaceScale;
     }
 
     function alpha(color, amount) {
@@ -176,122 +179,11 @@ Item {
         }
     }
 
-    component WheelColumn: Item {
-        id: wheelColumn
-
-        property string label: ""
-        property int value: 0
-        property int maximum: 59
-        property bool selected: false
-        signal deltaRequested(int delta)
-        signal selectedRequested()
-
-        width: root.s(67)
-        height: root.s(116)
-
-        function wrappedValue(offset) {
-            const range = maximum + 1;
-            return (value + offset + range) % range;
-        }
-
-        Text {
-            anchors.top: parent.top
-            anchors.horizontalCenter: parent.horizontalCenter
-            text: wheelColumn.label
-            color: root.alpha(root.subtextColor, 0.78)
-            font.family: "Noto Sans"
-            font.pixelSize: root.s(8)
-        }
-
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            y: root.s(24)
-            text: String(wheelColumn.wrappedValue(-1)).padStart(2, "0")
-            color: root.alpha(root.subtextColor, 0.23)
-            font.family: "Noto Sans"
-            font.pixelSize: root.s(19)
-            font.weight: Font.DemiBold
-        }
-
-        Text {
-            id: currentWheelText
-
-            anchors.centerIn: parent
-            anchors.verticalCenterOffset: root.s(7)
-            text: String(wheelColumn.value).padStart(2, "0")
-            color: wheelColumn.selected ? root.accentColor : root.textColor
-            font.family: "Noto Sans"
-            font.pixelSize: root.s(29)
-            font.weight: Font.Bold
-
-            Behavior on color {
-                ColorAnimation { duration: 220 }
-            }
-
-            SequentialAnimation {
-                id: wheelPulse
-
-                NumberAnimation {
-                    target: currentWheelText
-                    property: "scale"
-                    to: 0.88
-                    duration: 90
-                    easing.type: Easing.InCubic
-                }
-                NumberAnimation {
-                    target: currentWheelText
-                    property: "scale"
-                    to: 1.0
-                    duration: 190
-                    easing.type: Easing.OutBack
-                }
-            }
-        }
-
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.bottom: parent.bottom
-            text: String(wheelColumn.wrappedValue(1)).padStart(2, "0")
-            color: root.alpha(root.subtextColor, 0.23)
-            font.family: "Noto Sans"
-            font.pixelSize: root.s(19)
-            font.weight: Font.DemiBold
-        }
-
-        Rectangle {
-            anchors.centerIn: currentWheelText
-            width: root.s(58)
-            height: root.s(38)
-            radius: root.s(14)
-            color: root.alpha(root.accentColor, wheelColumn.selected ? 0.10 : 0.0)
-            border.width: wheelColumn.selected ? 1 : 0
-            border.color: root.alpha(root.accentColor, 0.22)
-            z: -1
-
-            Behavior on color {
-                ColorAnimation { duration: 220 }
-            }
-        }
-
-        MouseArea {
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: mouse => {
-                wheelColumn.selectedRequested();
-                if (mouse.y < wheelColumn.height * 0.38)
-                    wheelColumn.deltaRequested(-1);
-                else if (mouse.y > wheelColumn.height * 0.68)
-                    wheelColumn.deltaRequested(1);
-            }
-            onWheel: wheel => {
-                wheelColumn.selectedRequested();
-                wheelColumn.deltaRequested(wheel.angleDelta.y > 0 ? 1 : -1);
-                wheel.accepted = true;
-            }
-        }
-
-        onValueChanged: wheelPulse.restart()
+    component WheelColumn: AnimatedNumberWheel {
+        scaleFunc: root.s
+        textColor: root.textColor
+        subtextColor: root.subtextColor
+        accentColor: root.accentColor
     }
 
     component SettingRow: Item {
@@ -416,6 +308,15 @@ Item {
         anchors.fill: parent
         acceptedButtons: Qt.AllButtons
     }
+
+    Item {
+        id: interfaceStage
+
+        anchors.centerIn: parent
+        width: parent.width
+        height: root.verticalMode
+            ? Math.min(parent.height - root.s(28), root.s(520))
+            : parent.height
 
     Item {
         id: header
@@ -599,7 +500,7 @@ Item {
 
                 Row {
                     anchors.top: parent.top
-                    anchors.topMargin: root.s(2)
+                    anchors.topMargin: root.verticalMode ? root.s(42) : root.s(2)
                     anchors.horizontalCenter: parent.horizontalCenter
                     spacing: root.s(4)
 
@@ -660,7 +561,7 @@ Item {
 
                 Row {
                     anchors.top: parent.top
-                    anchors.topMargin: root.s(121)
+                    anchors.topMargin: root.verticalMode ? root.s(178) : root.s(121)
                     anchors.horizontalCenter: parent.horizontalCenter
                     spacing: root.s(7)
 
@@ -761,11 +662,11 @@ Item {
 
                 ClockDial {
                     anchors.top: parent.top
-                    anchors.topMargin: root.s(2)
+                    anchors.topMargin: root.verticalMode ? root.s(34) : root.s(2)
                     anchors.horizontalCenter: parent.horizontalCenter
-                    width: root.s(151)
+                    width: root.s(root.verticalMode ? 176 : 151)
                     height: width
-                    scaleFunc: root.scaleFunc
+                    scaleFunc: root.s
                     primaryColor: root.accentColor
                     secondaryColor: root.blueColor
                     surfaceColor: root.surface0Color
@@ -773,6 +674,10 @@ Item {
                     subtextColor: root.subtextColor
                     progress: root.timerPresetMs > 0
                         ? root.timerRemainingMs / root.timerPresetMs
+                        : 0
+                    handVisible: true
+                    handAngle: root.timerPresetMs > 0
+                        ? root.timerRemainingMs / root.timerPresetMs * 360
                         : 0
                     mainText: root.formatTime(root.timerRemainingMs, false)
                     eyebrowText: root.formatTime(root.timerPresetMs, false) + " total"
@@ -838,13 +743,13 @@ Item {
             }
 
             ClockDial {
-                anchors.left: parent.left
-                anchors.leftMargin: root.s(12)
-                anchors.top: parent.top
-                anchors.topMargin: root.s(5)
-                width: root.s(147)
+                id: stopwatchDial
+
+                x: root.verticalMode ? (parent.width - width) / 2 : root.s(12)
+                y: root.verticalMode ? root.s(18) : root.s(5)
+                width: root.s(root.verticalMode ? 174 : 147)
                 height: width
-                scaleFunc: root.scaleFunc
+                scaleFunc: root.s
                 primaryColor: root.blueColor
                 secondaryColor: root.accentColor
                 surfaceColor: root.surface0Color
@@ -858,13 +763,12 @@ Item {
             }
 
             Item {
-                anchors.left: parent.left
-                anchors.leftMargin: root.s(184)
-                anchors.right: parent.right
-                anchors.top: parent.top
-                anchors.topMargin: root.s(8)
-                anchors.bottom: parent.bottom
-                anchors.bottomMargin: root.s(60)
+                x: root.verticalMode ? root.s(24) : root.s(184)
+                y: root.verticalMode
+                    ? stopwatchDial.y + stopwatchDial.height + root.s(12)
+                    : root.s(8)
+                width: parent.width - x - (root.verticalMode ? root.s(24) : 0)
+                height: parent.height - y - root.s(60)
 
                 Rectangle {
                     id: stopwatchAlarmChip
@@ -1043,13 +947,13 @@ Item {
                 }
 
                 ClockDial {
-                    anchors.left: parent.left
-                    anchors.leftMargin: root.s(14)
-                    anchors.top: parent.top
-                    anchors.topMargin: root.s(5)
-                    width: root.s(147)
+                    id: pomodoroDial
+
+                    x: root.verticalMode ? (parent.width - width) / 2 : root.s(14)
+                    y: root.verticalMode ? root.s(18) : root.s(5)
+                    width: root.s(root.verticalMode ? 174 : 147)
                     height: width
-                    scaleFunc: root.scaleFunc
+                    scaleFunc: root.s
                     primaryColor: root.pomodoroState === 0 ? root.accentColor : root.greenColor
                     secondaryColor: root.pomodoroState === 0 ? root.pinkColor : root.sapphireColor
                     surfaceColor: root.surface0Color
@@ -1064,11 +968,11 @@ Item {
                 }
 
                 Column {
-                    anchors.left: parent.left
-                    anchors.leftMargin: root.s(192)
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    anchors.verticalCenterOffset: -root.s(23)
+                    x: root.verticalMode ? root.s(34) : root.s(192)
+                    y: root.verticalMode
+                        ? pomodoroDial.y + pomodoroDial.height + root.s(14)
+                        : (parent.height - height) / 2 - root.s(23)
+                    width: parent.width - x - (root.verticalMode ? root.s(34) : 0)
                     spacing: root.s(9)
 
                     Text {
@@ -1183,7 +1087,7 @@ Item {
                     anchors.margins: root.s(13)
                     spacing: root.s(2)
 
-                    Row {
+                    Item {
                         width: parent.width
                         height: root.s(27)
 
@@ -1259,7 +1163,7 @@ Item {
             opacity: root.activeMode === 3 ? 1 : 0
             scale: root.activeMode === 3 ? 1 : 0.965
             x: root.activeMode === 3 ? 0 : -root.transitionDirection * root.s(12)
-            visible: root.modeIsVisible(3, opacity)
+            visible: root.activeMode === 3
 
             Behavior on opacity {
                 NumberAnimation {
@@ -1284,7 +1188,7 @@ Item {
                 id: alarmPage
 
                 anchors.fill: parent
-                scaleFunc: root.scaleFunc
+                scaleFunc: root.s
                 baseColor: root.baseColor
                 mantleColor: root.mantleColor
                 surface0Color: root.surface0Color
@@ -1408,5 +1312,6 @@ Item {
                 }
             }
         }
+    }
     }
 }

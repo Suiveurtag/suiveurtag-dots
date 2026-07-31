@@ -1,4 +1,5 @@
 singleton AlarmManager 1.0 AlarmManager.qml
+AnimatedNumberWheel 1.0 AnimatedNumberWheel.qml
 AlarmView 1.0 AlarmView.qml
 ClockDial 1.0 ClockDial.qml
 LiquidBackground 1.0 LiquidBackground.qml
