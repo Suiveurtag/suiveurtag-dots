@@ -20,6 +20,7 @@ This repo currently contains:
 - `loading-icon`: shared white SVG loader used across wallpaper, updater, movies, network actions, and speedtest
 - `wifi-text-scroll`: smoothly scrolls a long active Wi-Fi name inside the network panel
 - `dns-mode-toggle`: animated per-connection switch between DHCP-provided and Mullvad DNS
+- `tor-panel`: isolated Tor network control and per-application routing on `Super+K`
 
 These addons are designed to stay isolated from the upstream dots:
 
@@ -97,4 +98,8 @@ The upstream ilyamiro installer is interactive, may request `sudo`, supports Arc
 - The speedtest addon uses `curl` against Cloudflare's `speed.cloudflare.com` download/upload endpoints and shows live download/upload progress, latency, and final results in its own Matugen-styled network panel view.
 - A long active Wi-Fi name scrolls automatically and continuously in the panel's central connection circle; other network cards, Ethernet, Bluetooth, and the top bar keep their original text behavior.
 - The Wi-Fi panel DNS toggle preserves the current mode during installation. **Maison** clears manual DNS and uses the DHCP-provided resolvers; **Mullvad** applies `194.242.2.2` and `2a07:e340::2` over authenticated DNS-over-TLS (`dns.mullvad.net`) only to the active Wi-Fi profile through NetworkManager.
+- `Super+K` opens the Tor panel. Its main switch starts a hardened user-level Tor client; the application list chooses which compatible native applications are launched through Tor from the regular `Super+D` app launcher.
+- Tor-routed applications start in a network namespace with no direct Internet interface. TCP and DNS go through a private Unix socket, and stopping Tor cuts their connectivity instead of falling back to the normal connection. The selection applies to new launches, not processes that are already open.
+- The Tor panel installs `tor`, `proxychains-ng`, `bubblewrap`, and `socat` when needed. Its route choices are stored under `~/.local/state/quickshell/tor-panel/`; the Tor service is not enabled at login and only starts on demand.
+- Flatpak apps, Steam/games, UDP-heavy software, and regular browsers are marked unsupported where strict routing cannot be guaranteed. For anonymous web browsing, use Tor Browser: routing another browser through Tor does not provide Tor Browser's anti-fingerprinting protections.
 - If you pull new upstream dots later, the path units should reapply the addons automatically.

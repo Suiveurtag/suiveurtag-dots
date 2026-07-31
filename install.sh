@@ -240,6 +240,33 @@ distro_is_supported() {
     [[ " $distro_like " == *" arch "* ]]
 }
 
+ensure_tor_runtime() {
+    local packages=()
+
+    command -v tor >/dev/null 2>&1 || packages+=(tor)
+    command -v proxychains4 >/dev/null 2>&1 || packages+=(proxychains-ng)
+    command -v bwrap >/dev/null 2>&1 || packages+=(bubblewrap)
+    command -v socat >/dev/null 2>&1 || packages+=(socat)
+
+    if ((${#packages[@]} > 0)); then
+        require_command sudo "Installe sudo, puis relance l'installation avec ton utilisateur normal."
+        require_command pacman "Le panel Tor nécessite Arch Linux ou un dérivé utilisant pacman."
+        info "Installation du runtime Tor isolé : ${packages[*]}"
+        if ! sudo pacman -S --needed --noconfirm "${packages[@]}"; then
+            die "Impossible d'installer le runtime du panel Tor." \
+                "Installe manuellement : sudo pacman -S --needed tor proxychains-ng bubblewrap socat"
+        fi
+    fi
+
+    local command_name
+    for command_name in tor proxychains4 bwrap socat; do
+        command -v "$command_name" >/dev/null 2>&1 \
+            || die "Runtime Tor incomplet : $command_name est introuvable." \
+                "Installe : sudo pacman -S --needed tor proxychains-ng bubblewrap socat"
+    done
+    success "Runtime Tor isolé prêt."
+}
+
 hypr_base_dir() {
     printf '%s\n' "${HYPR_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/hypr}"
 }
@@ -341,21 +368,31 @@ install_ilyamiro_dots() {
 }
 
 verify_installation() {
-    local hypr_base quickshell_dir addons_dir
+    local hypr_base quickshell_dir addons_dir systemd_dir
     hypr_base="$(hypr_base_dir)"
     quickshell_dir="$(quickshell_dir_for "$hypr_base")"
     addons_dir="${XDG_DATA_HOME:-$HOME/.local/share}/quickshell-addons"
+    systemd_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 
     [[ -f "$quickshell_dir/TopBar.qml" ]] \
         || die "La TopBar Quickshell est absente après installation." "$quickshell_dir/TopBar.qml"
     [[ -x "$addons_dir/topbar-button-effects/apply.sh" ]] \
         || die "Les addons n'ont pas été copiés correctement." "$addons_dir/topbar-button-effects/apply.sh est absent."
+    [[ -x "$addons_dir/tor-panel/tor_panelctl.py" ]] \
+        || die "Le backend du panel Tor n'a pas été copié correctement." "$addons_dir/tor-panel/tor_panelctl.py est absent."
+    [[ -f "$systemd_dir/tor-panel-tor.service" ]] \
+        || die "Le service Tor utilisateur n'a pas été installé." "$systemd_dir/tor-panel-tor.service est absent."
 
     if [[ -n "${XDG_RUNTIME_DIR:-}" ]] && command -v systemctl >/dev/null 2>&1; then
         if systemctl --user is-enabled topbar-button-effects-addon.path >/dev/null 2>&1; then
             success "Watchers systemd activés."
         else
             warn "Les fichiers sont installés, mais les watchers systemd ne sont pas encore activés."
+        fi
+        if systemctl --user is-enabled tor-panel-addon.path >/dev/null 2>&1; then
+            success "Panel Tor prêt sur Super+K."
+        else
+            warn "Le panel Tor est installé, mais son watcher systemd n'est pas encore activé."
         fi
     else
         warn "Session systemd utilisateur indisponible : les watchers s'activeront après connexion graphique."
@@ -419,8 +456,9 @@ main() {
     step "Installation des dots ilyamiro" "Cette étape est ignorée automatiquement si les dots sont déjà présents"
     install_ilyamiro_dots
 
-    step "Préparation des addons Suiveurtag" "Copie des composants et unités systemd"
+    step "Préparation des addons Suiveurtag" "Dépendances, composants et unités systemd"
     info "Sources locales : $source_dir"
+    ensure_tor_runtime
     success "Sources vérifiées."
 
     step "Application et activation" "Patches idempotents, réglages, keybinds et watchers"

@@ -1,0 +1,11 @@
+[Unit]
+Description=Watch the upstream files extended by the Tor panel
+
+[Path]
+PathChanged=%h/.config/hypr/scripts/quickshell/WindowRegistry.js
+PathChanged=%h/.config/hypr/settings.json
+PathChanged=%h/.config/hypr/scripts/quickshell/applauncher/appLauncher.qml
+Unit=tor-panel-addon.service
+
+[Install]
+WantedBy=default.target

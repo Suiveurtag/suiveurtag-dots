@@ -1,0 +1,36 @@
+[Unit]
+Description=On-demand Tor client for the Quickshell Tor panel
+Documentation=https://support.torproject.org/
+
+[Service]
+Type=notify
+NotifyAccess=all
+ExecStartPre=%h/.local/share/quickshell-addons/tor-panel/tor_service.sh verify
+ExecStart=%h/.local/share/quickshell-addons/tor-panel/tor_service.sh run
+StateDirectory=quickshell/tor-panel
+StateDirectoryMode=0700
+RuntimeDirectory=tor-panel
+RuntimeDirectoryMode=0700
+UMask=0077
+Restart=on-failure
+RestartSec=3s
+KillSignal=SIGINT
+TimeoutStartSec=90s
+TimeoutStopSec=30s
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=

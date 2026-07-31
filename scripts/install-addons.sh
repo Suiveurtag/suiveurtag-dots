@@ -79,6 +79,9 @@ install_addon() {
     if [[ -f "$dst/loopback.py" ]]; then
         chmod +x "$dst/loopback.py"
     fi
+    if [[ "$name" == "tor-panel" ]]; then
+        find "$dst" -maxdepth 1 -type f \( -name '*.py' -o -name '*.sh' \) -exec chmod +x {} +
+    fi
 }
 
 install_systemd_units() {
@@ -165,21 +168,22 @@ install_addon "speedtest"
 install_addon "loading-icon"
 install_addon "wifi-text-scroll"
 install_addon "dns-mode-toggle"
+install_addon "tor-panel"
 install_systemd_units
 
 if user_systemctl daemon-reload; then
     if ! user_systemctl try-restart hypr-zoomit.service; then
         warn "could not refresh the ZoomIt zoom daemon"
     fi
-    if ! user_systemctl enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path topbar-button-effects-addon.path launcher-web-search-addon.path custom-alarm-clock-addon.path headset-mic-loopback-addon.path captive-portal-addon.path speedtest-addon.path loading-icon-addon.path wifi-text-scroll-addon.path dns-mode-toggle-addon.path; then
+    if ! user_systemctl enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path topbar-button-effects-addon.path launcher-web-search-addon.path custom-alarm-clock-addon.path headset-mic-loopback-addon.path captive-portal-addon.path speedtest-addon.path loading-icon-addon.path wifi-text-scroll-addon.path dns-mode-toggle-addon.path tor-panel-addon.path; then
         warn "could not enable addon watcher units"
-        echo "  run: systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path topbar-button-effects-addon.path launcher-web-search-addon.path custom-alarm-clock-addon.path headset-mic-loopback-addon.path captive-portal-addon.path speedtest-addon.path loading-icon-addon.path wifi-text-scroll-addon.path dns-mode-toggle-addon.path" >&2
+        echo "  run: systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path topbar-button-effects-addon.path launcher-web-search-addon.path custom-alarm-clock-addon.path headset-mic-loopback-addon.path captive-portal-addon.path speedtest-addon.path loading-icon-addon.path wifi-text-scroll-addon.path dns-mode-toggle-addon.path tor-panel-addon.path" >&2
     fi
 else
     warn "user systemd session is not available; units were installed but not enabled"
     echo "  after logging into a graphical session, run:" >&2
     echo "    systemctl --user daemon-reload" >&2
-    echo "    systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path topbar-button-effects-addon.path launcher-web-search-addon.path custom-alarm-clock-addon.path headset-mic-loopback-addon.path captive-portal-addon.path speedtest-addon.path loading-icon-addon.path wifi-text-scroll-addon.path dns-mode-toggle-addon.path" >&2
+    echo "    systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path topbar-button-effects-addon.path launcher-web-search-addon.path custom-alarm-clock-addon.path headset-mic-loopback-addon.path captive-portal-addon.path speedtest-addon.path loading-icon-addon.path wifi-text-scroll-addon.path dns-mode-toggle-addon.path tor-panel-addon.path" >&2
 fi
 
 patch_failures=0
@@ -338,6 +342,17 @@ else
         echo "  install the Hyprland/Quickshell dots first; the watchers will apply these addons later" >&2
         patch_failures=$((patch_failures + 5))
     fi
+
+    if [[ -f "$WINDOW_REGISTRY" && -f "$HYPR_SETTINGS" && -f "$APP_LAUNCHER_QML" ]]; then
+        if ! run_apply TOR_PANEL_APPLY_DELAY=0 TOR_PANEL_APP_LAUNCHER="$APP_LAUNCHER_QML" "$ADDONS_DST/tor-panel/apply.sh"; then
+            warn "tor-panel patch failed"
+            patch_failures=$((patch_failures + 1))
+        fi
+    else
+        warn "Tor panel targets not found (expected $WINDOW_REGISTRY, $HYPR_SETTINGS and $APP_LAUNCHER_QML)"
+        echo "  install the Hyprland/Quickshell dots first; the watcher will apply this addon later" >&2
+        patch_failures=$((patch_failures + 1))
+    fi
 fi
 
 compile_hypr_config() {
@@ -379,4 +394,4 @@ if (( patch_failures > 0 )); then
     exit 1
 fi
 
-echo "Installed wallpaper-random, emoji-picker, matugen-vibrant, zoomit, screenshot-freeze, idle-inhibit, music-preview-rounded, topbar-button-effects, launcher-web-search, custom-alarm-clock, headset-mic-loopback, captive-portal, speedtest, loading-icon, wifi-text-scroll and dns-mode-toggle addons."
+echo "Installed wallpaper-random, emoji-picker, matugen-vibrant, zoomit, screenshot-freeze, idle-inhibit, music-preview-rounded, topbar-button-effects, launcher-web-search, custom-alarm-clock, headset-mic-loopback, captive-portal, speedtest, loading-icon, wifi-text-scroll, dns-mode-toggle and tor-panel addons."
