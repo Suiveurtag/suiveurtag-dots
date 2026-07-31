@@ -46,6 +46,15 @@ STATE_BLOCK = """    // BEGIN user-addon: wallpaper-random state
     property int randomScrollDirection: 0
     readonly property bool isRandomScrolling: randomScrollTimer.running || randomScrollSettleTimer.running
 
+    readonly property bool currentWallpaperIsVideo: window.targetWallName.startsWith("000_")
+
+    function toggleVideoAudio() {
+        if (!window.currentWallpaperIsVideo || window.isApplying) return;
+
+        searchState.videoAudioEnabled = !searchState.videoAudioEnabled;
+        window.applyWallpaper(window.targetWallName, true, true, true);
+    }
+
     function scrollToRandomWallpaper(targetIndex, fileName, isVideo) {
         randomScrollTimer.stop();
         randomScrollSettleTimer.stop();
@@ -137,6 +146,17 @@ RESET_BLOCK = """        // BEGIN user-addon: wallpaper-random manual reset
 """
 
 BUTTON_BLOCK = """            // BEGIN user-addon: wallpaper-random button
+            WallpaperRandom.VideoAudioButton {
+                visible: window.currentWallpaperIsVideo
+                uiScale: window.s(1)
+                active: searchState.videoAudioEnabled
+                available: !window.isApplying
+                textColor: _theme.text
+                surface1Color: _theme.surface1
+                surface2Color: _theme.surface2
+                onTriggered: window.toggleVideoAudio()
+            }
+
             WallpaperRandom.RandomWallpaperButton {
                 uiScale: window.s(1)
                 active: window.randomWallpaperActive
@@ -148,6 +168,11 @@ BUTTON_BLOCK = """            // BEGIN user-addon: wallpaper-random button
             }
             // END user-addon: wallpaper-random button
 
+"""
+
+AUDIO_SETTINGS_BLOCK = """        // BEGIN user-addon: wallpaper-video-audio setting
+        property bool videoAudioEnabled: false
+        // END user-addon: wallpaper-video-audio setting
 """
 
 MANAGER_BLOCK = r'''        # BEGIN user-addon: wallpaper-current-selection
@@ -212,6 +237,15 @@ def patch_picker(text: str) -> str:
         r".*?"
         r"// END user-addon: wallpaper-random button\n",
         "\n",
+        text,
+        count=1,
+        flags=re.DOTALL,
+    )
+    text = re.sub(
+        r"\n[ \t]*// BEGIN user-addon: wallpaper-video-audio setting\n"
+        r".*?"
+        r"// END user-addon: wallpaper-video-audio setting\n",
+        "",
         text,
         count=1,
         flags=re.DOTALL,
@@ -282,6 +316,41 @@ def patch_picker(text: str) -> str:
         r"^\s*Rectangle \{\s*\n\s*id: searchBox\s*$",
         BUTTON_BLOCK,
         after=False,
+    )
+    text = insert_once(
+        text,
+        "BEGIN user-addon: wallpaper-video-audio setting",
+        r'^\s*category:\s*"QS_WallpaperPicker"\s*$',
+        AUDIO_SETTINGS_BLOCK,
+        after=True,
+    )
+
+    audio_option = re.compile(
+        r'^\s*const videoAudioOption = searchState\.videoAudioEnabled\s*\?\s*"--audio=yes"\s*:\s*"--no-audio";\s*$',
+        flags=re.MULTILINE,
+    )
+    text = audio_option.sub("", text, count=1)
+    wallpaper_command_anchor = re.compile(r'^\s*let wallpaperCmd = "";\s*$', flags=re.MULTILINE)
+    if not wallpaper_command_anchor.search(text):
+        raise PatchError("wallpaper command anchor not found")
+    text = wallpaper_command_anchor.sub(
+        '        const videoAudioOption = searchState.videoAudioEnabled ? "--audio=yes" : "--no-audio";\n\n'
+        '        let wallpaperCmd = "";',
+        text,
+        count=1,
+    )
+
+    mpvpaper_audio = re.compile(
+        r"mpvpaper -o 'loop (?:--no-audio|\$\{videoAudioOption\}) "
+        r"--hwdec=auto --profile=high-quality --video-sync=display-resample "
+        r"--interpolation --tscale=oversample'"
+    )
+    if len(mpvpaper_audio.findall(text)) != 2:
+        raise PatchError("expected two mpvpaper wallpaper commands")
+    text = mpvpaper_audio.sub(
+        "mpvpaper -o 'loop ${videoAudioOption} --hwdec=auto --profile=high-quality "
+        "--video-sync=display-resample --interpolation --tscale=oversample'",
+        text,
     )
     text = re.sub(
         r"(// END user-addon: wallpaper-random button)\n+(\s*Rectangle \{\n\s*id: searchBox)",
@@ -357,7 +426,7 @@ def write_temporary(target: Path, content: str, prefix: str) -> Path:
 
 def install_assets() -> bool:
     changed = False
-    for name in ("RandomWallpaperButton.qml", "random.svg"):
+    for name in ("RandomWallpaperButton.qml", "VideoAudioButton.qml", "random.svg"):
         source = ADDON_DIR / name
         target = INSTALL_DIR / name
         if not source.is_file():
@@ -390,6 +459,7 @@ def main() -> int:
         return 1
 
     validate(ADDON_DIR / "RandomWallpaperButton.qml")
+    validate(ADDON_DIR / "VideoAudioButton.qml")
     assets_changed = install_assets()
 
     if patched == original and manager_patched == manager_original:

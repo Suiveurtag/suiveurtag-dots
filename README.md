@@ -4,7 +4,7 @@ Personal addons layered on top of ilyamiro's Hyprland + Quickshell dots.
 
 This repo currently contains:
 
-- `wallpaper-random`: random wallpaper button for the wallpaper picker
+- `wallpaper-random`: random wallpaper button and persistent animated-wallpaper audio toggle for the wallpaper picker
 - `emoji-picker`: emoji keyboard on `Super+J`
 - `matugen-vibrant`: optional wallpaper-matched expanded color palette
 - `zoomit`: smooth cursor-following magnifier and frozen-screen drawing overlay
@@ -81,6 +81,7 @@ The upstream ilyamiro installer is interactive, may request `sudo`, supports Arc
 - Timer, Stopwatch, Pomodoro, and Alarm share a One UI-inspired clock layout with circular controls, a floating bottom navigation pill, state morphs, and slowly drifting background lights sourced from the current Matugen palette.
 - Alarm settings are stored under `~/.local/state/quickshell/custom-alarm-clock/`. The shared player and scheduler are singletons, so multi-monitor sessions produce one alarm rather than one per monitor.
 - In the audio panel's **Streams** tab, **Headset audio as microphone** creates a `Headset Audio` input from the current output. Select that input in Discord, OBS, or another recording app; turning the option off removes it.
+- When the current wallpaper is animated, the wallpaper picker shows a speaker button. It enables or mutes `mpvpaper` audio, remembers the choice, and applies it to subsequent animated wallpapers without changing the system volume.
 - Vibrant Matugen colors are opt-in under **Settings → Addons**. Enabling the option uses Matugen's vibrant scheme for Quickshell and maps the image-derived Base16 accents to the full UI palette with a small saturation boost.
 - Frozen screenshot selection is enabled by default under **Settings → Addons → Freeze screen during selection**. It freezes regional screenshots, including edit mode, while full-screen screenshots remain instant and screen recording stays live.
 - The CAVA music visualizer is opt-in under **Settings → Addons → Music visualizer**. It replaces the previous/play/next buttons with a smooth Matugen-colored spectrum; click the spectrum to play or pause.
