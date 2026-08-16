@@ -126,9 +126,9 @@ def update_route(desktop_id: str, enabled: bool) -> dict[str, Any]:
     catalog = {app["desktopId"]: app for app in application_catalog()}
     app = catalog.get(desktop_id)
     if not app:
-        raise TorPanelError(f"Application introuvable : {desktop_id}")
+        raise TorPanelError(f"Application not found: {desktop_id}")
     if enabled and app["support"] != "strict":
-        raise TorPanelError(app["reason"] or "Cette application ne peut pas être isolée strictement.")
+        raise TorPanelError(app["reason"] or "This application cannot be strictly isolated.")
 
     ensure_state_dir()
     with LOCK_FILE.open("a+", encoding="utf-8") as lock:
@@ -236,18 +236,18 @@ def support_for(app: dict[str, str]) -> tuple[str, str]:
     command = f" {app['exec'].lower()} "
     categories = app.get("categories", "").lower()
     if "flatpak run" in command or "/snap/bin/" in command or " snap run " in command:
-        return "unsupported", "Sandbox applicatif imbriqué : routage strict non garanti"
+        return "unsupported", "Nested application sandbox: strict routing cannot be guaranteed"
     if "steam://" in command or re.search(r"(^|\s)steam(\s|$)", command):
-        return "unsupported", "Steam et les jeux utilisent souvent UDP et ne sont pas pris en charge"
+        return "unsupported", "Steam and games often use UDP and are not supported"
     if "game;" in categories:
-        return "unsupported", "Les jeux et leur trafic UDP ne sont pas pris en charge"
+        return "unsupported", "Games and their UDP traffic are not supported"
     if any(marker in command for marker in TORRENT_MARKERS):
-        return "unsupported", "BitTorrent ne doit pas être utilisé sur le réseau Tor"
+        return "unsupported", "BitTorrent must not be used over the Tor network"
     if any(marker in command for marker in BROWSER_MARKERS):
-        return "unsupported", "Pour le Web, utilise Tor Browser et ses protections anti-empreinte"
+        return "unsupported", "For web browsing, use Tor Browser and its anti-fingerprinting protections"
     if any(re.search(rf"(^|\s){re.escape(marker)}(\s|$)", command) for marker in PRIVILEGED_MARKERS):
-        return "unsupported", "Une application privilégiée ne peut pas rester dans le sandbox utilisateur"
-    return "strict", "TCP et DNS isolés ; UDP et accès réseau direct bloqués"
+        return "unsupported", "A privileged application cannot remain inside the user sandbox"
+    return "strict", "TCP and DNS isolated; UDP and direct network access blocked"
 
 
 def application_catalog() -> list[dict[str, Any]]:
@@ -319,23 +319,23 @@ def read_control_reply(stream: Any) -> tuple[int, str]:
     while True:
         raw_line = stream.readline()
         if not raw_line:
-            raise TorPanelError("Le contrôle Tor a fermé la connexion")
+            raise TorPanelError("The Tor control port closed the connection")
         line = raw_line.decode("utf-8", errors="replace").rstrip("\r\n")
         if len(line) < 4 or not line[:3].isdigit():
-            raise TorPanelError(f"Réponse de contrôle Tor invalide : {line}")
+            raise TorPanelError(f"Invalid Tor control response: {line}")
         code = int(line[:3])
         separator = line[3]
         if expected_code < 0:
             expected_code = code
         elif code != expected_code:
-            raise TorPanelError(f"Codes de contrôle Tor incohérents : {expected_code}/{code}")
+            raise TorPanelError(f"Inconsistent Tor control codes: {expected_code}/{code}")
         lines.append(line)
 
         if separator == "+":
             while True:
                 data_line = stream.readline()
                 if not data_line:
-                    raise TorPanelError("Bloc de données du contrôle Tor incomplet")
+                    raise TorPanelError("Incomplete Tor control data block")
                 decoded = data_line.decode("utf-8", errors="replace").rstrip("\r\n")
                 if decoded == ".":
                     break
@@ -343,12 +343,12 @@ def read_control_reply(stream: Any) -> tuple[int, str]:
         elif separator == " ":
             return expected_code, "\n".join(lines)
         elif separator != "-":
-            raise TorPanelError(f"Séparateur de contrôle Tor invalide : {separator}")
+            raise TorPanelError(f"Invalid Tor control separator: {separator}")
 
 
 def control_exchange(*commands: str) -> list[str]:
     if not CONTROL_SOCKET.exists() or not CONTROL_COOKIE.is_file():
-        raise TorPanelError("Le port de contrôle Tor n'est pas encore prêt")
+        raise TorPanelError("The Tor control port is not ready yet")
     cookie = CONTROL_COOKIE.read_bytes().hex()
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as control:
         control.settimeout(1.5)
@@ -357,14 +357,14 @@ def control_exchange(*commands: str) -> list[str]:
         control.sendall(f"AUTHENTICATE {cookie}\r\n".encode("ascii"))
         auth_code, auth_reply = read_control_reply(stream)
         if auth_code != 250:
-            raise TorPanelError(f"Authentification du contrôle Tor refusée : {auth_reply}")
+            raise TorPanelError(f"Tor control authentication rejected: {auth_reply}")
 
         replies: list[str] = []
         for command in commands:
             control.sendall((command + "\r\n").encode("ascii"))
             code, reply = read_control_reply(stream)
             if code != 250:
-                raise TorPanelError(f"Commande Tor refusée ({command}) : {reply}")
+                raise TorPanelError(f"Tor command rejected ({command}): {reply}")
             replies.append(reply)
         return replies
 
@@ -376,7 +376,7 @@ def control_status() -> tuple[int, str, int]:
     progress_match = re.search(r"PROGRESS=(\d+)", bootstrap_reply)
     summary_match = re.search(r'SUMMARY="([^"]*)"', bootstrap_reply)
     progress = int(progress_match.group(1)) if progress_match else 0
-    summary = summary_match.group(1) if summary_match else "Connexion au réseau Tor"
+    summary = summary_match.group(1) if summary_match else "Connecting to the Tor network"
     circuits = len(re.findall(r"(?m)^\d+\s+BUILT\s", circuits_reply))
     return progress, summary, circuits
 
@@ -394,7 +394,7 @@ def status_payload() -> dict[str, Any]:
     props = service_properties()
     active_state = props.get("ActiveState", "inactive")
     progress = 0
-    summary = "Tor est déconnecté"
+    summary = "Tor is disconnected"
     circuits = 0
     control_error = ""
     if active_state in {"active", "activating"}:
@@ -402,17 +402,17 @@ def status_payload() -> dict[str, Any]:
             progress, summary, circuits = control_status()
         except (OSError, TorPanelError) as error:
             control_error = str(error)
-            summary = "Initialisation du client Tor"
+            summary = "Starting the Tor client"
 
     if props.get("LoadState") == "not-found":
         state = "unavailable"
-        summary = "Service Tor utilisateur absent"
+        summary = "User Tor service is missing"
     elif active_state == "failed" or props.get("Result") not in {"", "success"}:
         state = "error"
-        summary = "Le service Tor a rencontré une erreur"
+        summary = "The Tor service encountered an error"
     elif active_state == "active" and progress >= 100:
         state = "connected"
-        summary = "Circuit Tor prêt"
+        summary = "Tor circuit ready"
     elif active_state in {"active", "activating", "reloading"}:
         state = "connecting"
     else:
@@ -428,7 +428,7 @@ def status_payload() -> dict[str, Any]:
         "circuits": circuits,
         "uptime": uptime_seconds(props) if state == "connected" else 0,
         "selectedCount": sum(1 for value in routes.values() if value.get("enabled")),
-        "socks": "socket Unix privé",
+        "socks": "private Unix socket",
         "dependencies": deps,
         "runtimeReady": all(deps.values()),
         "serviceState": active_state,
@@ -438,16 +438,16 @@ def status_payload() -> dict[str, Any]:
 
 def network_action(action: str) -> dict[str, Any]:
     if not dependencies()["tor"]:
-        raise TorPanelError("Tor n'est pas installé")
+        raise TorPanelError("Tor is not installed")
     if service_properties().get("LoadState") == "not-found":
-        raise TorPanelError("Le service tor-panel-tor.service n'est pas installé")
+        raise TorPanelError("The tor-panel-tor.service user service is not installed")
     if action == "start":
         result = systemctl("--no-block", "start", SERVICE)
     else:
         result = systemctl("stop", SERVICE)
     if result.returncode:
         details = (result.stderr or result.stdout).strip()
-        raise TorPanelError(details or f"Impossible de {action} Tor")
+        raise TorPanelError(details or f"Unable to {action} Tor")
     time.sleep(0.15)
     return status_payload()
 
@@ -463,9 +463,9 @@ def parsed_exec(command: str) -> list[str]:
     try:
         argv = shlex.split(command)
     except ValueError as error:
-        raise TorPanelError(f"Commande .desktop invalide : {error}") from error
+        raise TorPanelError(f"Invalid .desktop command: {error}") from error
     if not argv:
-        raise TorPanelError("Commande d'application vide")
+        raise TorPanelError("Empty application command")
     return argv
 
 
@@ -474,7 +474,7 @@ def catalog_route_for_exec(command: str) -> tuple[dict[str, Any], dict[str, Any]
     matches = [app for app in application_catalog() if parsed_exec(app["exec"]) == wanted]
     if not matches:
         raise TorPanelError(
-            "Commande absente du catalogue d'applications ; lancement refusé pour éviter un contournement du routage"
+            "Command not found in the application catalog; launch refused to prevent a routing bypass"
         )
 
     routes = load_routes().get("routes", {})
@@ -486,7 +486,7 @@ def catalog_route_for_exec(command: str) -> tuple[dict[str, Any], dict[str, Any]
     if len(matches) > 1 and 0 < len(routed) < len(matches):
         names = ", ".join(app["name"] for app in matches)
         raise TorPanelError(
-            f"Commande partagée par plusieurs entrées ({names}) avec des modes différents ; harmonise leurs choix Tor"
+            f"Command shared by multiple entries ({names}) with different modes; make their Tor choices consistent"
         )
     if routed:
         app = routed[0]
@@ -567,24 +567,24 @@ def sandbox_bindings() -> list[str]:
 def tor_launch(app: dict[str, Any]) -> None:
     missing = [label for label, ready in dependencies().items() if not ready]
     if missing:
-        raise TorPanelError("Runtime Tor incomplet : " + ", ".join(missing))
+        raise TorPanelError("Incomplete Tor runtime: " + ", ".join(missing))
 
     if app["support"] != "strict":
         raise TorPanelError(app["reason"])
 
     current = status_payload()
     if current["state"] != "connected":
-        notify("Connexion à Tor", f"Préparation du lancement de {app['name']}…")
+        notify("Connecting to Tor", f"Preparing to launch {app['name']}…")
         network_action("start")
         if not wait_until_connected():
-            raise TorPanelError("Tor n'a pas établi de circuit ; lancement annulé sans connexion directe")
+            raise TorPanelError("Tor did not establish a circuit; launch canceled without a direct connection")
 
     argv = parsed_exec(app["exec"])
     desktop_id = app["desktopId"]
     bwrap = shutil.which("bwrap")
     entry = ADDON_DIR / "tor_sandbox_entry.sh"
     if not bwrap or not entry.is_file():
-        raise TorPanelError("Le lanceur isolé Tor est incomplet")
+        raise TorPanelError("The isolated Tor launcher is incomplete")
 
     environment = os.environ.copy()
     environment["TOR_PANEL_SOCKS_SOCKET"] = str(SOCKS_SOCKET)
@@ -627,7 +627,7 @@ def tor_launch(app: dict[str, Any]) -> None:
         str(entry),
         *argv,
     ]
-    notify("Lancement via Tor", f"{app['name']} utilise un namespace réseau isolé.")
+    notify("Launched through Tor", f"{app['name']} is using an isolated network namespace.")
     os.execvpe(bwrap, sandbox, environment)
 
 
@@ -687,7 +687,7 @@ def main() -> int:
     except (OSError, ValueError, TorPanelError, subprocess.SubprocessError) as error:
         message = str(error) or error.__class__.__name__
         if args.command == "launch":
-            notify("Lancement Tor annulé", message, "critical")
+            notify("Tor launch canceled", message, "critical")
         emit({"ok": False, "error": message})
         return 1
 

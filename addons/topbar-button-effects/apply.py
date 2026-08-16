@@ -214,16 +214,22 @@ def patch_topbar(text: str) -> str:
     )
 
     if TOPBAR_STATE_BEGIN not in text:
-        state_anchor = '''            property string activeWidget: ""
-            property bool isSettingsOpen: activeWidget === "settings"'''
+        state_anchor = re.search(
+            r'(?m)^(?P<indent>\s*)property string activeWidget:\s*""\s*\n'
+            r'(?P=indent)property bool isSettingsOpen: activeWidget === "settings"\s*$',
+            text,
+        )
+        if not state_anchor:
+            raise PatchError("anchor not found: TopBar animation state")
+        original_state = state_anchor.group(0)
         state_block = f'''            {TOPBAR_STATE_BEGIN}
             property bool topbarButtonAnimations: true
             property string activeWidgetArg: ""
             property var topbarButtonEffectPalette: [mocha.blue, mocha.mauve, mocha.pink, mocha.peach, mocha.teal]
             {TOPBAR_STATE_END}
 
-{state_anchor}'''
-        text = replace_once(text, state_anchor, state_block, "TopBar animation state")
+{original_state}'''
+        text = text[: state_anchor.start()] + state_block + text[state_anchor.end() :]
 
     if TOPBAR_WIDGET_BEGIN not in text:
         old = '''                    onStreamFinished: {

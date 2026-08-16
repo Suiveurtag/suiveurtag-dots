@@ -55,8 +55,8 @@ Item {
     property string torState: "unknown"
     property real bootstrapProgress: 0
     property real animatedProgress: bootstrapProgress
-    property string statusDetail: "Lecture de l’état du réseau Tor…"
-    property string socksAddress: "socket Unix privé"
+    property string statusDetail: "Reading Tor network status…"
+    property string socksAddress: "private Unix socket"
     property bool busy: false
     property string activeAction: ""
     property string errorMessage: ""
@@ -76,9 +76,9 @@ Item {
     readonly property color statusAccentSecondary: torRunning ? pink
                                                                : (torStarting ? yellow
                                                                               : (torState === "error" ? red : blue))
-    readonly property string stateLabel: torRunning ? "CONNECTÉ"
-                                                     : (torStarting ? "CONNEXION"
-                                                                    : (torState === "error" ? "ERREUR" : "DÉCONNECTÉ"))
+    readonly property string stateLabel: torRunning ? "CONNECTED"
+                                                     : (torStarting ? "CONNECTING"
+                                                                    : (torState === "error" ? "ERROR" : "DISCONNECTED"))
 
     Behavior on animatedProgress {
         NumberAnimation { duration: 720; easing.type: Easing.OutQuint }
@@ -126,18 +126,18 @@ Item {
         if (typeof raw === "string" && raw !== "") {
             const normalized = raw.toLowerCase()
             if (normalized === "unsupported" || normalized === "incompatible" || normalized === "false")
-                return { state: "unsupported", label: "Non compatible" }
+                return { state: "unsupported", label: "Unsupported" }
             if (normalized === "limited" || normalized === "partial" || normalized === "tcp-only" || normalized === "tcp")
-                return { state: "partial", label: "Compatibilité limitée" }
+                return { state: "partial", label: "Limited support" }
             if (normalized === "strict")
-                return { state: "compatible", label: "Isolation stricte" }
+                return { state: "compatible", label: "Strict isolation" }
             if (normalized === "full" || normalized === "compatible" || normalized === "true")
                 return { state: "compatible", label: "Compatible" }
             return { state: "compatible", label: raw }
         }
         const compatible = firstValue(app, ["compatible", "is_compatible"], true)
         return compatible ? { state: "compatible", label: "Compatible" }
-                          : { state: "unsupported", label: "Non compatible" }
+                          : { state: "unsupported", label: "Unsupported" }
     }
 
     function isAppRouted(app) {
@@ -186,7 +186,7 @@ Item {
         if (!payload) return
         if (payload.ok === false) {
             torState = "error"
-            errorMessage = String(firstValue(payload, ["error", "message"], "Action Tor impossible"))
+            errorMessage = String(firstValue(payload, ["error", "message"], "Tor action failed"))
             return
         }
         const statusObject = payload.tor && typeof payload.tor === "object" ? payload.tor : payload
@@ -203,7 +203,7 @@ Item {
         }
 
         statusDetail = String(firstValue(statusObject,
-            ["message", "detail", "summary"], torRunning ? "Circuit Tor prêt" : statusDetail))
+            ["message", "detail", "summary"], torRunning ? "Tor circuit ready" : statusDetail))
         socksAddress = String(firstValue(statusObject,
             ["socks", "socks_address", "proxy"], socksAddress))
         const error = firstValue(payload, ["error", "error_message"], "")
@@ -212,7 +212,7 @@ Item {
 
     function applyAppsPayload(payload) {
         if (payload && payload.ok === false) {
-            errorMessage = String(firstValue(payload, ["error", "message"], "Catalogue d’applications indisponible"))
+            errorMessage = String(firstValue(payload, ["error", "message"], "Application catalog unavailable"))
             return
         }
         const apps = Array.isArray(payload) ? payload
@@ -228,7 +228,7 @@ Item {
         try {
             return JSON.parse(raw)
         } catch (error) {
-            errorMessage = "Réponse invalide du contrôleur Tor"
+            errorMessage = "Invalid response from the Tor controller"
             return null
         }
     }
@@ -304,7 +304,7 @@ Item {
                 const payload = root.parseJson(this.text)
                 if (!payload) return
                 if (payload.ok === false)
-                    root.errorMessage = String(root.firstValue(payload, ["error", "message"], "Routage impossible"))
+                    root.errorMessage = String(root.firstValue(payload, ["error", "message"], "Unable to change routing"))
                 else if (payload.apps || payload.applications)
                     root.applyAppsPayload(payload)
             }
@@ -453,7 +453,7 @@ Item {
                     }
 
                     Text {
-                        text: "Circuit privé et routage par application"
+                        text: "Private circuit and per-application routing"
                         color: root.subtext0
                         font.family: "JetBrains Mono"
                         font.pixelSize: root.s(10)
@@ -723,7 +723,7 @@ Item {
                                     }
                                     Text {
                                         anchors.verticalCenter: parent.verticalCenter
-                                        text: root.torEnabled ? "DÉCONNECTER" : "CONNECTER"
+                                        text: root.torEnabled ? "DISCONNECT" : "CONNECT"
                                         color: root.crust
                                         font.family: "JetBrains Mono"
                                         font.pixelSize: root.s(9)
@@ -763,7 +763,7 @@ Item {
                                 }
 
                                 ToolTip.visible: identityAction.containsMouse
-                                ToolTip.text: "Nouvelle identité"
+                                ToolTip.text: "New identity"
                                 ToolTip.delay: 350
 
                                 MouseArea {
@@ -831,7 +831,7 @@ Item {
                                 Layout.preferredWidth: root.s(220)
                                 Layout.preferredHeight: root.s(38)
                                 color: root.text
-                                placeholderText: "Rechercher…"
+                                placeholderText: "Search…"
                                 placeholderTextColor: root.subtext0
                                 font.family: "JetBrains Mono"
                                 font.pixelSize: root.s(10)
@@ -870,7 +870,7 @@ Item {
                             border.width: 1
 
                             property var entries: [
-                                { key: "all", label: "Toutes" },
+                                { key: "all", label: "All" },
                                 { key: "tor", label: "Tor" },
                                 { key: "direct", label: "Direct" }
                             ]
@@ -1126,7 +1126,7 @@ Item {
                             Text {
                                 anchors.centerIn: parent
                                 visible: appModel.count === 0
-                                text: root.searchQuery !== "" ? "Aucune application trouvée" : "Aucune application dans ce filtre"
+                                text: root.searchQuery !== "" ? "No applications found" : "No applications in this filter"
                                 color: root.subtext0
                                 font.family: "JetBrains Mono"
                                 font.pixelSize: root.s(11)
@@ -1170,7 +1170,7 @@ Item {
 
                     Text {
                         Layout.fillWidth: true
-                        text: "Les changements s’appliquent au prochain lancement de l’application. Seul le trafic TCP est routé via Tor."
+                        text: "Changes apply the next time the application starts. Only TCP traffic is routed through Tor."
                         color: root.subtext0
                         elide: Text.ElideRight
                         font.family: "JetBrains Mono"

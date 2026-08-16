@@ -54,6 +54,8 @@ POPUP_MARKERS = (
 )
 ADDON_CATEGORY_BEGIN = "// BEGIN user-addon: addon-settings category"
 ADDON_CATEGORY_END = "// END user-addon: addon-settings category"
+TAB_VISIBILITY_BEGIN = "// BEGIN user-addon: responsive-settings-tabs"
+TAB_VISIBILITY_END = "// END user-addon: responsive-settings-tabs"
 
 
 class PatchError(RuntimeError):
@@ -324,7 +326,7 @@ def patch_addon_category(text: str) -> str:
                 "                            MusicVisualizerSettings.AddonSettingsPage {",
                 "qualified Addons page type",
             )
-        return upgrade_idle_setting(text)
+        return upgrade_settings_tab_visibility(upgrade_idle_setting(text))
 
     required_markers = (
         "matugen-vibrant card",
@@ -502,7 +504,50 @@ def patch_addon_category(text: str) -> str:
                     Loader {
                         id: monitorsLoader'''
     text = replace_once(text, monitors_loader, addons_loader, "Addons loader")
-    return upgrade_idle_setting(text)
+    return upgrade_settings_tab_visibility(upgrade_idle_setting(text))
+
+
+def upgrade_settings_tab_visibility(text: str) -> str:
+    """Keep every Settings category reachable on narrow fresh installs."""
+    if TAB_VISIBILITY_BEGIN in text:
+        if TAB_VISIBILITY_END not in text:
+            raise PatchError("partial responsive Settings tabs patch detected")
+        return text
+
+    width_line = re.search(
+        r"(?m)^(?P<indent>\s*)property real tabItemW: "
+        r"\(tabBarContainer\.width - root\.s\(6\)\) / "
+        r"\(root\.tabNames\.length <= 3 \? 3 : 2\.5\)\s*$",
+        text,
+    )
+    if not width_line:
+        raise PatchError("Settings tab width anchor not found")
+
+    indent = width_line.group("indent")
+    replacement = (
+        f"{indent}{TAB_VISIBILITY_BEGIN}\n"
+        f"{indent}// Fit every category in the bar. On very narrow panels the icon remains\n"
+        f"{indent}// visible and the label is available as a tooltip.\n"
+        f"{indent}property real tabItemW: (tabBarContainer.width - root.s(6)) / root.tabNames.length\n"
+        f"{indent}{TAB_VISIBILITY_END}"
+    )
+    text = text[: width_line.start()] + replacement + text[width_line.end() :]
+
+    label_anchor = '''                                        Text {
+                                            text: root.tabNames[index]'''
+    label_replacement = '''                                        Text {
+                                            id: tabNameLabel
+                                            visible: tabBarFlickable.tabItemW >= root.s(76)
+                                            text: root.tabNames[index]'''
+    text = replace_once(text, label_anchor, label_replacement, "responsive Settings tab label")
+
+    click_anchor = '''                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: { root.currentTab = index; root.clearHighlight(); }'''
+    click_replacement = '''                                        cursorShape: Qt.PointingHandCursor
+                                        ToolTip.visible: containsMouse && !tabNameLabel.visible
+                                        ToolTip.text: root.tabNames[index]
+                                        onClicked: { root.currentTab = index; root.clearHighlight(); }'''
+    return replace_once(text, click_anchor, click_replacement, "responsive Settings tab tooltip")
 
 
 def upgrade_idle_setting(text: str) -> str:

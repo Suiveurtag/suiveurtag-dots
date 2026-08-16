@@ -44,9 +44,9 @@ fail() {
     exit 1
 }
 
-command -v nmcli >/dev/null 2>&1 || fail "NetworkManager (nmcli) est introuvable"
-command -v jq >/dev/null 2>&1 || fail "jq est introuvable"
-command -v resolvectl >/dev/null 2>&1 || fail "systemd-resolved (resolvectl) est introuvable"
+command -v nmcli >/dev/null 2>&1 || fail "NetworkManager (nmcli) was not found"
+command -v jq >/dev/null 2>&1 || fail "jq was not found"
+command -v resolvectl >/dev/null 2>&1 || fail "systemd-resolved (resolvectl) was not found"
 
 exec 9>"$LOCK_PATH"
 flock 9
@@ -55,7 +55,7 @@ wifi_device="$(
     nmcli -t -f DEVICE,TYPE,STATE device status \
         | awk -F: '$2 == "wifi" && $3 == "connected" { print $1; exit }'
 )"
-[[ -n "$wifi_device" ]] || fail "Aucune connexion Wi-Fi active"
+[[ -n "$wifi_device" ]] || fail "No active Wi-Fi connection"
 
 mapfile -t general < <(
     nmcli --escape no -g GENERAL.CONNECTION,GENERAL.CON-UUID device show "$wifi_device"
@@ -63,7 +63,7 @@ mapfile -t general < <(
 connection_name="${general[0]:-}"
 connection_uuid="${general[1]:-}"
 [[ -n "$connection_name" && -n "$connection_uuid" ]] \
-    || fail "Impossible d'identifier le profil Wi-Fi actif" "$connection_name" "$wifi_device"
+    || fail "Unable to identify the active Wi-Fi profile" "$connection_name" "$wifi_device"
 
 read_dns_settings() {
     mapfile -t dns_settings < <(
@@ -106,7 +106,7 @@ if [[ "$ACTION" == "toggle" ]]; then
 elif [[ "$ACTION" == "set" && ( "$REQUESTED_MODE" == "home" || "$REQUESTED_MODE" == "mullvad" ) ]]; then
     target_mode="$REQUESTED_MODE"
 else
-    fail "Usage : dns_mode_toggle.sh status|toggle|set home|mullvad" "$connection_name" "$wifi_device"
+    fail "Usage: dns_mode_toggle.sh status|toggle|set home|mullvad" "$connection_name" "$wifi_device"
 fi
 
 old_ignore_ipv4="$ignore_ipv4"
@@ -152,14 +152,14 @@ fi
 if ! nmcli device reapply "$wifi_device" >/dev/null 2>&1 \
     && ! nmcli connection up uuid "$connection_uuid" ifname "$wifi_device" >/dev/null 2>&1; then
     restore_previous_settings
-    fail "NetworkManager n'a pas pu appliquer le nouveau DNS" "$connection_name" "$wifi_device"
+    fail "NetworkManager could not apply the new DNS settings" "$connection_name" "$wifi_device"
 fi
 
 read_dns_settings
 applied_mode="$(detect_mode)"
 if [[ "$applied_mode" != "$target_mode" ]]; then
     restore_previous_settings
-    fail "Le profil Wi-Fi n'a pas conservé le mode DNS demandé" "$connection_name" "$wifi_device"
+    fail "The Wi-Fi profile did not retain the requested DNS mode" "$connection_name" "$wifi_device"
 fi
 
 if [[ "$target_mode" == "mullvad" ]]; then
@@ -178,11 +178,11 @@ if [[ "$target_mode" == "mullvad" ]]; then
     done
     if [[ "$resolution_ok" != "true" ]]; then
         restore_previous_settings
-        fail "Le DNS-over-TLS Mullvad ne répond pas; mode précédent restauré" "$connection_name" "$wifi_device"
+        fail "Mullvad DNS-over-TLS is not responding; the previous mode was restored" "$connection_name" "$wifi_device"
     fi
 fi
 
 message="$([[ "$target_mode" == "mullvad" ]] \
-    && printf 'DNS-over-TLS Mullvad actif sur cette connexion Wi-Fi' \
-    || printf 'DNS automatiques DHCP réactivés')"
+    && printf 'Mullvad DNS-over-TLS is active on this Wi-Fi connection' \
+    || printf 'Automatic DHCP DNS restored')"
 emit_json "ok" "$applied_mode" "$connection_name" "$wifi_device" "$message"

@@ -39,11 +39,11 @@ Item {
                 errorMessage = "";
             } else {
                 mode = "unavailable";
-                errorMessage = payload.message || "DNS indisponible";
+                errorMessage = payload.message || "DNS unavailable";
             }
         } catch (error) {
             mode = "unavailable";
-            errorMessage = "Réponse DNS invalide";
+            errorMessage = "Invalid DNS response";
         }
     }
 
@@ -174,7 +174,7 @@ Item {
 
             Repeater {
                 model: [
-                    { mode: "home", icon: "󰖟", label: "Maison" },
+                    { mode: "home", icon: "󰖟", label: "Home" },
                     { mode: "mullvad", icon: "󰌾", label: "Mullvad" }
                 ]
 
