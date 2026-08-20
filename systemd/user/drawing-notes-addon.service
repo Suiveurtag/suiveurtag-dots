@@ -1,0 +1,6 @@
+[Unit]
+Description=Reapply the drawing and Markdown notes widget addon
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/share/quickshell-addons/drawing-notes/apply.sh

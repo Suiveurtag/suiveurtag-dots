@@ -1,0 +1,10 @@
+[Unit]
+Description=Watch the Quickshell drawing and Markdown notes widget
+
+[Path]
+PathChanged=%h/.config/hypr/scripts/quickshell/Floating.qml
+PathChanged=%h/.config/hypr/scripts/quickshell/quickactions/DrawingNotesAction.qml
+Unit=drawing-notes-addon.service
+
+[Install]
+WantedBy=default.target

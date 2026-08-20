@@ -8,6 +8,7 @@ This repo currently contains:
 - `emoji-picker`: emoji keyboard on `Super+J`
 - `matugen-vibrant`: optional wallpaper-matched expanded color palette
 - `zoomit`: smooth cursor-following magnifier and frozen-screen drawing overlay
+- `drawing-notes`: toggle the floating drawing widget between its canvas and an autosaved Markdown notepad
 - `screenshot-freeze`: optional Windows-style frozen screen while selecting a screenshot region
 - `idle-inhibit`: optional switch that disables automatic idle locking and suspension
 - `music-preview-rounded`: rounded album artwork and an optional CAVA visualizer in the Quickshell top bar

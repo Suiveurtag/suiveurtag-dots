@@ -57,6 +57,7 @@ MAIN_QML="$QUICKSHELL_DIR/Main.qml"
 ADDON_SETTINGS_PAGE="$QUICKSHELL_DIR/settings/AddonSettingsPage.qml"
 APP_LAUNCHER_QML="$QUICKSHELL_DIR/applauncher/appLauncher.qml"
 TIMER_QML="$QUICKSHELL_DIR/quickactions/Timer.qml"
+FLOATING_QML="$QUICKSHELL_DIR/Floating.qml"
 VOLUME_POPUP_QML="$QUICKSHELL_DIR/volume/VolumePopup.qml"
 NETWORK_POPUP_QML="$QUICKSHELL_DIR/network/NetworkPopup.qml"
 
@@ -162,6 +163,7 @@ install_addon "music-preview-rounded"
 install_addon "topbar-button-effects"
 install_addon "launcher-web-search"
 install_addon "custom-alarm-clock"
+install_addon "drawing-notes"
 install_addon "headset-mic-loopback"
 install_addon "captive-portal"
 install_addon "speedtest"
@@ -175,15 +177,15 @@ if user_systemctl daemon-reload; then
     if ! user_systemctl try-restart hypr-zoomit.service; then
         warn "could not refresh the ZoomIt zoom daemon"
     fi
-    if ! user_systemctl enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path topbar-button-effects-addon.path launcher-web-search-addon.path custom-alarm-clock-addon.path headset-mic-loopback-addon.path captive-portal-addon.path speedtest-addon.path loading-icon-addon.path wifi-text-scroll-addon.path dns-mode-toggle-addon.path tor-panel-addon.path; then
+    if ! user_systemctl enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path topbar-button-effects-addon.path launcher-web-search-addon.path custom-alarm-clock-addon.path drawing-notes-addon.path headset-mic-loopback-addon.path captive-portal-addon.path speedtest-addon.path loading-icon-addon.path wifi-text-scroll-addon.path dns-mode-toggle-addon.path tor-panel-addon.path; then
         warn "could not enable addon watcher units"
-        echo "  run: systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path topbar-button-effects-addon.path launcher-web-search-addon.path custom-alarm-clock-addon.path headset-mic-loopback-addon.path captive-portal-addon.path speedtest-addon.path loading-icon-addon.path wifi-text-scroll-addon.path dns-mode-toggle-addon.path tor-panel-addon.path" >&2
+        echo "  run: systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path topbar-button-effects-addon.path launcher-web-search-addon.path custom-alarm-clock-addon.path drawing-notes-addon.path headset-mic-loopback-addon.path captive-portal-addon.path speedtest-addon.path loading-icon-addon.path wifi-text-scroll-addon.path dns-mode-toggle-addon.path tor-panel-addon.path" >&2
     fi
 else
     warn "user systemd session is not available; units were installed but not enabled"
     echo "  after logging into a graphical session, run:" >&2
     echo "    systemctl --user daemon-reload" >&2
-    echo "    systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path topbar-button-effects-addon.path launcher-web-search-addon.path custom-alarm-clock-addon.path headset-mic-loopback-addon.path captive-portal-addon.path speedtest-addon.path loading-icon-addon.path wifi-text-scroll-addon.path dns-mode-toggle-addon.path tor-panel-addon.path" >&2
+    echo "    systemctl --user enable --now wallpaper-random-addon.path emoji-picker-addon.path matugen-vibrant-addon.path zoomit-addon.path screenshot-freeze-addon.path idle-inhibit-addon.path music-preview-rounded-addon.path topbar-button-effects-addon.path launcher-web-search-addon.path custom-alarm-clock-addon.path drawing-notes-addon.path headset-mic-loopback-addon.path captive-portal-addon.path speedtest-addon.path loading-icon-addon.path wifi-text-scroll-addon.path dns-mode-toggle-addon.path tor-panel-addon.path" >&2
 fi
 
 patch_failures=0
@@ -305,6 +307,17 @@ else
         patch_failures=$((patch_failures + 1))
     fi
 
+    if [[ -f "$FLOATING_QML" && -f "$QUICKSHELL_DIR/quickactions/DrawAction.qml" ]]; then
+        if ! run_apply DRAWING_NOTES_APPLY_DELAY=0 DRAWING_NOTES_FLOATING_QML="$FLOATING_QML" "$ADDONS_DST/drawing-notes/apply.sh"; then
+            warn "drawing-notes patch failed"
+            patch_failures=$((patch_failures + 1))
+        fi
+    else
+        warn "Quickshell drawing widget not found (expected $FLOATING_QML and $QUICKSHELL_DIR/quickactions/DrawAction.qml)"
+        echo "  install the Hyprland/Quickshell dots first; the watcher will apply this addon later" >&2
+        patch_failures=$((patch_failures + 1))
+    fi
+
     if [[ -f "$VOLUME_POPUP_QML" ]]; then
         if ! run_apply HEADSET_MIC_LOOPBACK_APPLY_DELAY=0 "$ADDONS_DST/headset-mic-loopback/apply.sh"; then
             warn "headset-mic-loopback patch failed"
@@ -394,4 +407,4 @@ if (( patch_failures > 0 )); then
     exit 1
 fi
 
-echo "Installed wallpaper-random, emoji-picker, matugen-vibrant, zoomit, screenshot-freeze, idle-inhibit, music-preview-rounded, topbar-button-effects, launcher-web-search, custom-alarm-clock, headset-mic-loopback, captive-portal, speedtest, loading-icon, wifi-text-scroll, dns-mode-toggle and tor-panel addons."
+echo "Installed wallpaper-random, emoji-picker, matugen-vibrant, zoomit, screenshot-freeze, idle-inhibit, music-preview-rounded, topbar-button-effects, launcher-web-search, custom-alarm-clock, drawing-notes, headset-mic-loopback, captive-portal, speedtest, loading-icon, wifi-text-scroll, dns-mode-toggle and tor-panel addons."
