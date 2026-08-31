@@ -168,13 +168,159 @@ def patch_registry(text: str) -> str:
 def patch_main(text: str) -> str:
     if '"legacysettings"' not in text and '"tor"' in text:
         text = text.replace('"emoji", "tor"]', '"emoji", "tor", "legacysettings"]', 1)
-    if '"emoji", "tor"' in text:
+    if '"emoji", "tor"' not in text:
+        pattern = re.compile(r'(property var _allWidgetNames: \[[^\]]*)(\])')
+        match = pattern.search(text)
+        if not match:
+            raise ApplyError("Main.qml widget preload list not found")
+        text = text[: match.start()] + match.group(1) + ', "emoji", "tor"' + match.group(2) + text[match.end() :]
+
+    marker = "BEGIN user-addon: calendar-legacy-v1-animation"
+    if marker in text:
         return text
-    pattern = re.compile(r'(property var _allWidgetNames: \[[^\]]*)(\])')
-    match = pattern.search(text)
-    if not match:
-        raise ApplyError("Main.qml widget preload list not found")
-    return text[: match.start()] + match.group(1) + ', "emoji", "tor"' + match.group(2) + text[match.end() :]
+
+    property_anchor = "    property bool disableMorph: true\n"
+    if property_anchor not in text:
+        raise ApplyError("Main.qml morph state anchor not found")
+    text = text.replace(
+        property_anchor,
+        property_anchor
+        + "\n    // BEGIN user-addon: calendar-legacy-v1-animation\n"
+        + "    property bool legacyCalendarAnimation: false\n"
+        + "    // END user-addon: calendar-legacy-v1-animation\n",
+        1,
+    )
+
+    container_anchor = "        clip: true\n\n        Item {\n            id: contentStage\n"
+    container_block = (
+        "        clip: true\n\n"
+        "        // V1 used the animated bounding box itself as the calendar content surface.\n"
+        "        opacity: masterWindow.legacyCalendarAnimation ? (masterWindow.isVisible ? 1.0 : 0.0) : 1.0\n"
+        "        Behavior on opacity {\n"
+        "            enabled: masterWindow.legacyCalendarAnimation\n"
+        "            NumberAnimation { duration: 160; easing.type: masterWindow.isVisible ? Easing.OutCubic : Easing.InCubic }\n"
+        "        }\n\n"
+        "        Item {\n"
+        "            id: contentStage\n"
+    )
+    if container_anchor not in text:
+        raise ApplyError("Main.qml animated container anchor not found")
+    text = text.replace(container_anchor, container_block, 1)
+
+    text = text.replace(
+        "            width: masterWindow._stageW\n            height: masterWindow._stageH\n",
+        "            width: masterWindow.legacyCalendarAnimation ? animContainer.width : masterWindow._stageW\n"
+        "            height: masterWindow.legacyCalendarAnimation ? animContainer.height : masterWindow._stageH\n",
+        1,
+    )
+    text = text.replace(
+        "            scale: masterWindow.isVisible ? 1.0 : 0.96\n",
+        "            scale: masterWindow.legacyCalendarAnimation ? 1.0 : (masterWindow.isVisible ? 1.0 : 0.96)\n",
+        1,
+    )
+    text = text.replace(
+        "            opacity: masterWindow.isVisible ? 1.0 : 0.0\n",
+        "            opacity: masterWindow.legacyCalendarAnimation ? 1.0 : (masterWindow.isVisible ? 1.0 : 0.0)\n",
+        1,
+    )
+
+    enter_transition = (
+        "                replaceEnter: Transition {\n"
+        "                    enabled: masterWindow.legacyCalendarAnimation\n"
+        "                    ParallelAnimation {\n"
+        "                        NumberAnimation { property: \"opacity\"; from: 0.0; to: 1.0; duration: masterWindow.morphDurationSwitch; easing.type: Easing.OutQuint }\n"
+        "                        NumberAnimation { property: \"scale\"; from: 0.98; to: 1.0; duration: masterWindow.morphDurationSwitch; easing.type: Easing.OutBack; easing.overshoot: 1.1 }\n"
+        "                    }\n"
+        "                }\n"
+    )
+    exit_transition = (
+        "                replaceExit: Transition {\n"
+        "                    enabled: masterWindow.legacyCalendarAnimation\n"
+        "                    ParallelAnimation {\n"
+        "                        NumberAnimation { property: \"opacity\"; from: 1.0; to: 0.0; duration: masterWindow.morphDurationSwitch; easing.type: Easing.InQuint }\n"
+        "                        NumberAnimation { property: \"scale\"; from: 1.0; to: 0.98; duration: masterWindow.morphDurationSwitch; easing.type: Easing.OutCubic }\n"
+        "                    }\n"
+        "                }\n"
+    )
+    text = text.replace(
+        "                replaceEnter: null\n                replaceExit: null\n",
+        enter_transition + exit_transition,
+        1,
+    )
+
+    switch_anchor = "        masterWindow.targetActive = newWidget;\n"
+    if switch_anchor not in text:
+        raise ApplyError("Main.qml widget switch anchor not found")
+    text = text.replace(
+        switch_anchor,
+        switch_anchor
+        + "        masterWindow.legacyCalendarAnimation = newWidget === \"calendar\" || (newWidget === \"hidden\" && masterWindow.currentActive === \"calendar\");\n",
+        1,
+    )
+
+    close_anchor = (
+        '                masterWindow.currentActive = "hidden";\n'
+        "                masterWindow.morphDuration = masterWindow.exitDuration;\n"
+        "                masterWindow.disableMorph = true;\n"
+        "                masterWindow.isVisible = false;\n"
+    )
+    close_replacement = (
+        '                masterWindow.currentActive = "hidden";\n'
+        "                masterWindow.morphDuration = masterWindow.legacyCalendarAnimation ? 160 : masterWindow.exitDuration;\n"
+        "                masterWindow.disableMorph = masterWindow.legacyCalendarAnimation ? false : true;\n"
+        "                if (masterWindow.legacyCalendarAnimation) {\n"
+        "                    masterWindow._animW = 1;\n"
+        "                    masterWindow._animH = 1;\n"
+        "                }\n"
+        "                masterWindow.isVisible = false;\n"
+    )
+    if close_anchor not in text:
+        raise ApplyError("Main.qml close animation anchor not found")
+    text = text.replace(close_anchor, close_replacement, 1)
+
+    open_anchor = (
+        "        } else {\n"
+        "            executeSwitch(newWidget, arg, gen);\n"
+        "        }\n"
+    )
+    open_replacement = (
+        "        } else {\n"
+        "            if (newWidget === \"calendar\" && masterWindow.currentActive === \"hidden\") {\n"
+        "                let t = getLayout(newWidget);\n"
+        "                if (t) {\n"
+        "                    masterWindow.morphDuration = 230;\n"
+        "                    masterWindow.morphDurationSwitch = 210;\n"
+        "                    masterWindow.disableMorph = false;\n"
+        "                    masterWindow._animX = t.rx;\n"
+        "                    masterWindow._animY = t.ry;\n"
+        "                    masterWindow._animW = t.w;\n"
+        "                    masterWindow._animH = t.h;\n"
+        "                }\n"
+        "            }\n"
+        "            executeSwitch(newWidget, arg, gen);\n"
+        "        }\n"
+    )
+    if open_anchor not in text:
+        raise ApplyError("Main.qml open animation anchor not found")
+    text = text.replace(open_anchor, open_replacement, 1)
+
+    hidden_anchor = (
+        "        if (isComingFromHidden) {\n"
+        "            masterWindow.disableMorph = true;\n"
+        "        } else {\n"
+    )
+    hidden_replacement = (
+        "        if (isComingFromHidden && newWidget === \"calendar\") {\n"
+        "            masterWindow.morphDuration = 230;\n"
+        "            masterWindow.morphDurationSwitch = 210;\n"
+        "            masterWindow.disableMorph = false;\n"
+        "        } else if (isComingFromHidden) {\n"
+        "            masterWindow.disableMorph = true;\n"
+        "        } else {\n"
+    )
+    if hidden_anchor not in text:
+        raise ApplyError("Main.qml hidden-state animation anchor not found")
+    return text.replace(hidden_anchor, hidden_replacement, 1)
 
 
 def patch_floating(text: str) -> str:
