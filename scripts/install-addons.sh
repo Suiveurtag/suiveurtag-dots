@@ -169,6 +169,7 @@ install_serpantinum_v2_addons() {
         drawing-notes \
         custom-alarm-clock \
         wallpaper-random \
+        calendar-legacy \
         serpantinum-settings \
         matugen-vibrant \
         screenshot-freeze \

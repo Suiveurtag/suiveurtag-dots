@@ -460,6 +460,7 @@ def main() -> int:
         ADDONS_ROOT / "idle-inhibit/IdleInhibitCard.qml": QS_DIR / "settings/IdleInhibitCard.qml",
         ADDONS_ROOT / "wallpaper-random/RandomWallpaperButton.qml": QS_DIR / "wallpaper/RandomWallpaperButton.qml",
         ADDONS_ROOT / "wallpaper-random/random.svg": QS_DIR / "wallpaper/random.svg",
+        ADDONS_ROOT / "calendar-legacy/CalendarPopup.qml": QS_DIR / "calendar/CalendarPopup.qml",
     }
     alarm_source = ADDONS_ROOT / "custom-alarm-clock"
     for source in alarm_source.iterdir():
