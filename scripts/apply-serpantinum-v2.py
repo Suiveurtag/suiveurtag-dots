@@ -493,6 +493,7 @@ def main() -> int:
         "dns-mode-toggle",
         {"DNS_MODE_TOGGLE_NETWORK_POPUP": str(QS_DIR / "network/NetworkPopup.qml")},
     )
+    run_legacy_compatible("wifi-hold-sound", {})
     run_legacy_compatible("captive-portal", {})
     run_legacy_compatible("speedtest", {})
 

@@ -179,6 +179,7 @@ install_serpantinum_v2_addons() {
         captive-portal \
         speedtest \
         dns-mode-toggle \
+        wifi-hold-sound \
         tor-panel; do
         install_addon "$addon"
     done
@@ -238,6 +239,7 @@ install_addon "speedtest"
 install_addon "loading-icon"
 install_addon "wifi-text-scroll"
 install_addon "dns-mode-toggle"
+install_addon "wifi-hold-sound"
 install_addon "tor-panel"
 install_systemd_units
 
@@ -416,6 +418,14 @@ else
         fi
         if ! run_apply DNS_MODE_TOGGLE_APPLY_DELAY=0 "$ADDONS_DST/dns-mode-toggle/apply.sh"; then
             warn "dns-mode-toggle patch failed"
+            patch_failures=$((patch_failures + 1))
+        fi
+        if ! run_apply WIFI_HOLD_SOUND_APPLY_DELAY=0 "$ADDONS_DST/wifi-hold-sound/apply.sh"; then
+            warn "wifi-hold-sound patch failed"
+            patch_failures=$((patch_failures + 1))
+        fi
+        if ! run_apply WIFI_HOLD_SOUND_APPLY_DELAY=0 "$ADDONS_DST/wifi-hold-sound/apply.sh"; then
+            warn "wifi-hold-sound patch failed"
             patch_failures=$((patch_failures + 1))
         fi
     else
