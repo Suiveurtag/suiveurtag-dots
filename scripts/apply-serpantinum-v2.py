@@ -168,13 +168,27 @@ def patch_registry(text: str) -> str:
 def patch_main(text: str) -> str:
     if '"legacysettings"' not in text and '"tor"' in text:
         text = text.replace('"emoji", "tor"]', '"emoji", "tor", "legacysettings"]', 1)
-    if '"emoji", "tor"' in text:
+    if '"emoji", "tor"' not in text:
+        pattern = re.compile(r'(property var _allWidgetNames: \[[^\]]*)(\])')
+        match = pattern.search(text)
+        if not match:
+            raise ApplyError("Main.qml widget preload list not found")
+        text = text[: match.start()] + match.group(1) + ', "emoji", "tor"' + match.group(2) + text[match.end() :]
+
+    marker = "BEGIN user-addon: calendar-legacy-v1-intro-hook"
+    if marker in text:
         return text
-    pattern = re.compile(r'(property var _allWidgetNames: \[[^\]]*)(\])')
-    match = pattern.search(text)
-    if not match:
-        raise ApplyError("Main.qml widget preload list not found")
-    return text[: match.start()] + match.group(1) + ', "emoji", "tor"' + match.group(2) + text[match.end() :]
+    anchor = "        masterWindow.isVisible = true;\n"
+    if anchor not in text:
+        raise ApplyError("Main.qml calendar intro hook anchor not found")
+    hook = (
+        "        // BEGIN user-addon: calendar-legacy-v1-intro-hook\n"
+        "        if (newWidget === \"calendar\" && cachedItem.resetAndPlayIntro !== undefined) {\n"
+        "            cachedItem.resetAndPlayIntro();\n"
+        "        }\n"
+        "        // END user-addon: calendar-legacy-v1-intro-hook\n"
+    )
+    return text.replace(anchor, hook + anchor, 1)
 
 
 def patch_floating(text: str) -> str:
