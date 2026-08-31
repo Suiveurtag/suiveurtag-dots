@@ -21,6 +21,8 @@ BACKUP_DIR = ADDON_DIR / "backups"
 
 BEGIN = "// BEGIN user-addon: wifi-hold-sound"
 END = "// END user-addon: wifi-hold-sound"
+HOLD_BEGIN = "// BEGIN user-addon: wifi-hold-sound-hold-loop"
+HOLD_END = "// END user-addon: wifi-hold-sound-hold-loop"
 
 
 class PatchError(RuntimeError):
@@ -40,13 +42,53 @@ def patch_popup(text: str) -> str:
     if BEGIN in text or END in text:
         if BEGIN not in text or END not in text:
             raise PatchError("partial wifi-hold-sound marker detected")
+    else:
+        old = '                                if (window.expectedWifiPower === "on") Sounds.playSfx("network/power_on.wav"); else Sounds.playSfx("network/power_off.wav");'
+        if old not in text:
+            raise PatchError("Wi-Fi power sound anchor not found")
+        replacement = f"                                {BEGIN}\n{old}\n                                {END}"
+        text = text.replace(old, replacement, 1)
+
+    if HOLD_BEGIN in text or HOLD_END in text:
+        if HOLD_BEGIN not in text or HOLD_END not in text:
+            raise PatchError("partial Wi-Fi hold sound marker detected")
         return text
 
-    old = '                                if (window.expectedWifiPower === "on") Sounds.playSfx("network/power_on.wav"); else Sounds.playSfx("network/power_off.wav");'
-    if old not in text:
-        raise PatchError("Wi-Fi power sound anchor not found")
-    replacement = f"                                {BEGIN}\n{old}\n                                {END}"
-    return text.replace(old, replacement, 1)
+    property_anchor = "                            property real disconnectFill: 0.0\n"
+    if property_anchor not in text:
+        raise PatchError("Wi-Fi hold state anchor not found")
+    text = text.replace(
+        property_anchor,
+        property_anchor
+        + f"                            {HOLD_BEGIN}\n"
+        + "                            property int holdSoundHandle: -1\n"
+        + f"                            {HOLD_END}\n",
+        1,
+    )
+    pressed_anchor = "                                        coreDrainAnim.stop();\n                                        coreFillAnim.start();"
+    pressed_replacement = (
+        "                                        coreDrainAnim.stop();\n"
+        "                                        if (typeof Sounds !== \"undefined\") {\n"
+        "                                            if (centralCore.holdSoundHandle !== -1) Sounds.stopSfx(centralCore.holdSoundHandle);\n"
+        "                                            centralCore.holdSoundHandle = Sounds.playUntilStopped(\"reusables/fillbutton/charge_loop.wav\", 0.6, false);\n"
+        "                                        }\n"
+        "                                        coreFillAnim.start();"
+    )
+    if pressed_anchor not in text:
+        raise PatchError("Wi-Fi hold press anchor not found")
+    text = text.replace(pressed_anchor, pressed_replacement, 1)
+    released_anchor = "                                        coreFillAnim.stop();\n                                        coreDrainAnim.start();"
+    released_replacement = (
+        "                                        coreFillAnim.stop();\n"
+        "                                        if (centralCore.holdSoundHandle !== -1 && typeof Sounds !== \"undefined\") {\n"
+        "                                            Sounds.stopSfx(centralCore.holdSoundHandle);\n"
+        "                                            centralCore.holdSoundHandle = -1;\n"
+        "                                        }\n"
+        "                                        coreDrainAnim.start();"
+    )
+    if released_anchor not in text:
+        raise PatchError("Wi-Fi hold release anchor not found")
+    return text.replace(released_anchor, released_replacement, 1)
 
 
 def main() -> int:
