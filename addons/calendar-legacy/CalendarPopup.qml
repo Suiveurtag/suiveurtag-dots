@@ -10,12 +10,20 @@ import "../singletons"
 
 Item {
     id: window
+    focus: true
 
     // Serpantinum V2 keeps scaling in the shared singleton.
     readonly property real sf: Scaler.baseScale
 
     function s(val) {
         return Scaler.s(val);
+    }
+
+    Timer {
+        id: focusTimer
+        interval: 50
+        repeat: false
+        onTriggered: window.forceActiveFocus()
     }
 
     // -------------------------------------------------------------------------
@@ -126,8 +134,41 @@ Item {
     property real introWeather: 0
     property real introSchedule: 0
 
+    function resetAndPlayIntro() {
+        startupComplete = false;
+        introMain = 0;
+        introAmbient = 0;
+        introClock = 0;
+        introCalendar = 0;
+        introWeather = 0;
+        introSchedule = 0;
+        introAnim.restart();
+    }
+
+    onVisibleChanged: {
+        if (visible) {
+            forceActiveFocus();
+            focusTimer.restart();
+            window.currentTime = new Date();
+            updateCalendarGrid();
+            Weather.refresh(false);
+            resetAndPlayIntro();
+        } else {
+            introAnim.stop();
+            exitAnim.stop();
+            startupComplete = false;
+            introMain = 0;
+            introAmbient = 0;
+            introClock = 0;
+            introCalendar = 0;
+            introWeather = 0;
+            introSchedule = 0;
+        }
+    }
+
     SequentialAnimation {
-        running: true
+        id: introAnim
+        running: false
         
         // 50ms buffer to allow the window manager to map the surface before animating
         PauseAnimation { duration: 20 }
@@ -479,6 +520,7 @@ Item {
     Component.onCompleted: {
         updateCalendarGrid();
         Weather.refresh(false);
+        if (visible) resetAndPlayIntro();
     }
 
     // -------------------------------------------------------------------------
