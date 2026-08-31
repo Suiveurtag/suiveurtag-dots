@@ -1,0 +1,6 @@
+[Unit]
+Description=Reapply the Quickshell random wallpaper addon
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/share/quickshell-addons/wallpaper-random/apply.sh

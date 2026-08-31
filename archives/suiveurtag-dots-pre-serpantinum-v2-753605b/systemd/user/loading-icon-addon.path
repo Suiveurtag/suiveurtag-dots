@@ -1,0 +1,13 @@
+[Unit]
+Description=Watch the upstream Quickshell loaders for the shared loading icon
+
+[Path]
+PathChanged=%h/.config/hypr/scripts/quickshell/wallpaper/WallpaperPicker.qml
+PathChanged=%h/.config/hypr/scripts/quickshell/updater/UpdaterPopup.qml
+PathChanged=%h/.config/hypr/scripts/quickshell/movies/MovieWidget.qml
+PathChanged=%h/.config/hypr/scripts/quickshell/network/NetworkPopup.qml
+PathChanged=%h/.config/hypr/scripts/quickshell/network/SpeedtestPanel.qml
+Unit=loading-icon-addon.service
+
+[Install]
+WantedBy=default.target

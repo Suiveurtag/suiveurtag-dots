@@ -1,0 +1,7 @@
+[Unit]
+Description=Reapply the shared Quickshell loading icon
+After=speedtest-addon.service
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/share/quickshell-addons/loading-icon/apply.sh

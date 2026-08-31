@@ -1,0 +1,7 @@
+[Unit]
+Description=Reapply the Quickshell Tor panel addon
+After=emoji-picker-addon.service launcher-web-search-addon.service
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/share/quickshell-addons/tor-panel/apply.sh

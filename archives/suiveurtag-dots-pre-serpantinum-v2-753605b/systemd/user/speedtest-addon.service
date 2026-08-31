@@ -1,0 +1,6 @@
+[Unit]
+Description=Reapply the Quickshell native speedtest addon
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/share/quickshell-addons/speedtest/apply.sh

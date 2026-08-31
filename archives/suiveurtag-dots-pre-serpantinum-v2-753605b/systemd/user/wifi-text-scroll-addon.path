@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch the Quickshell Wi-Fi panel for smooth long text scrolling
+
+[Path]
+PathChanged=%h/.config/hypr/scripts/quickshell/network/NetworkPopup.qml
+Unit=wifi-text-scroll-addon.service
+
+[Install]
+WantedBy=default.target

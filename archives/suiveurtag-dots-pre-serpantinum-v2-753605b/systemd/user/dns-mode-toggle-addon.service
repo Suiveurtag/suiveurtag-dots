@@ -1,0 +1,7 @@
+[Unit]
+Description=Reapply the NetworkManager DNS mode toggle
+After=speedtest-addon.service wifi-text-scroll-addon.service
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/share/quickshell-addons/dns-mode-toggle/apply.sh

@@ -1,0 +1,6 @@
+[Unit]
+Description=Reapply the Hyprland ZoomIt addon
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/share/quickshell-addons/zoomit/apply.sh

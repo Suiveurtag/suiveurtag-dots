@@ -1,0 +1,6 @@
+[Unit]
+Description=Reapply the vibrant Matugen colors addon
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/share/quickshell-addons/matugen-vibrant/apply.sh

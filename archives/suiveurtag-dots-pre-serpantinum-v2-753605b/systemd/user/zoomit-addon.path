@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch the Hyprland settings extended by the ZoomIt addon
+
+[Path]
+PathChanged=%h/.config/hypr/settings.json
+Unit=zoomit-addon.service
+
+[Install]
+WantedBy=default.target

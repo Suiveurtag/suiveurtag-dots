@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch the Quickshell audio panel
+
+[Path]
+PathChanged=%h/.config/hypr/scripts/quickshell/volume/VolumePopup.qml
+Unit=headset-mic-loopback-addon.service
+
+[Install]
+WantedBy=default.target

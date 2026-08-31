@@ -1,0 +1,6 @@
+[Unit]
+Description=Reapply Tab-to-search in Zen to the Quickshell application launcher
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/share/quickshell-addons/launcher-web-search/apply.sh

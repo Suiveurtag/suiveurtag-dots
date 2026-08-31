@@ -1,0 +1,10 @@
+[Unit]
+Description=Watch the upstream files extended by the emoji picker
+
+[Path]
+PathChanged=%h/.config/hypr/scripts/quickshell/WindowRegistry.js
+PathChanged=%h/.config/hypr/settings.json
+Unit=emoji-picker-addon.service
+
+[Install]
+WantedBy=default.target

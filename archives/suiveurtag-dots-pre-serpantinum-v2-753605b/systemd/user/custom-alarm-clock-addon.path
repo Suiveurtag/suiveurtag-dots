@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch the upstream Quickshell Timer widget for custom alarms
+
+[Path]
+PathChanged=%h/.config/hypr/scripts/quickshell/quickactions/Timer.qml
+Unit=custom-alarm-clock-addon.service
+
+[Install]
+WantedBy=default.target

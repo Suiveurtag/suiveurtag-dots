@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch the Hyprland idle setting
+
+[Path]
+PathChanged=%h/.config/hypr/settings.json
+Unit=idle-inhibit-addon.service
+
+[Install]
+WantedBy=default.target

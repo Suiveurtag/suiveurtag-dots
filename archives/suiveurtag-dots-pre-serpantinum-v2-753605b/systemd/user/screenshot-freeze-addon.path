@@ -1,0 +1,12 @@
+[Unit]
+Description=Watch the files extended by the frozen screenshot addon
+
+[Path]
+PathChanged=%h/.config/hypr/scripts/screenshot.sh
+PathChanged=%h/.config/hypr/scripts/quickshell/ScreenshotOverlay.qml
+PathChanged=%h/.config/hypr/scripts/quickshell/settings/SettingsPopup.qml
+PathChanged=%h/.config/hypr/settings.json
+Unit=screenshot-freeze-addon.service
+
+[Install]
+WantedBy=default.target

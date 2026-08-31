@@ -1,0 +1,6 @@
+[Unit]
+Description=Reapply rounded music preview artwork
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/share/quickshell-addons/music-preview-rounded/apply.sh

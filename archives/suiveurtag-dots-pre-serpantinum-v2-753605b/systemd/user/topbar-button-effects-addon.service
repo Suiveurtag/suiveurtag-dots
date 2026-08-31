@@ -1,0 +1,7 @@
+[Unit]
+Description=Reapply animated Quickshell top bar buttons
+After=music-preview-rounded-addon.service
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/share/quickshell-addons/topbar-button-effects/apply.sh

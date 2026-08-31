@@ -1,0 +1,6 @@
+[Unit]
+Description=Reapply the Quickshell emoji picker addon
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/share/quickshell-addons/emoji-picker/apply.sh

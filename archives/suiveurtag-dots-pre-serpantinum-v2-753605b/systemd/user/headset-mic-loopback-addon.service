@@ -1,0 +1,6 @@
+[Unit]
+Description=Reapply the headset audio virtual microphone control
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/share/quickshell-addons/headset-mic-loopback/apply.sh
