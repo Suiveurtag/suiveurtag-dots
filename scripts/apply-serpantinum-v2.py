@@ -226,6 +226,17 @@ def patch_network_compat(text: str) -> str:
 
 
 def patch_wallpaper(text: str) -> str:
+    import_block = '''// BEGIN user-addon: wallpaper-random import
+import "." as WallpaperRandom
+// END user-addon: wallpaper-random import
+
+'''
+    text = add_before(
+        text,
+        "Item {\n    id: window",
+        import_block,
+        "BEGIN user-addon: wallpaper-random import",
+    )
     function_block = '''    // BEGIN user-addon: serpantinum-v2 random wallpaper
     function applyRandomWallpaper() {
         let modelRef = window.activeModel;
@@ -247,31 +258,26 @@ def patch_wallpaper(text: str) -> str:
         "BEGIN user-addon: serpantinum-v2 random wallpaper",
     )
     button_block = '''            // BEGIN user-addon: serpantinum-v2 random wallpaper button
-            CanvasIconButton {
-                id: randomWallpaperButton
-                size: window.s(34)
-                cornerRadius: window.s(10)
-                iconSize: window.s(16)
-                accentColor: ThemeBackend.surface0
-                textColor: ThemeBackend.subtext0
-                enabled: !window.isApplying && window.activeModel && window.activeModel.count > 0
-                paintCanvas: function(ctx, canvas) {
-                    var s = window.s;
-                    ctx.strokeStyle = randomWallpaperButton.textColor;
-                    ctx.lineWidth = s(1.7);
-                    ctx.lineCap = "round";
-                    ctx.beginPath();
-                    ctx.moveTo(s(9), s(11)); ctx.lineTo(s(12), s(11)); ctx.lineTo(s(22), s(23)); ctx.lineTo(s(25), s(23));
-                    ctx.moveTo(s(22), s(20)); ctx.lineTo(s(25), s(23)); ctx.lineTo(s(22), s(26));
-                    ctx.moveTo(s(9), s(23)); ctx.lineTo(s(12), s(23)); ctx.lineTo(s(22), s(11)); ctx.lineTo(s(25), s(11));
-                    ctx.moveTo(s(22), s(8)); ctx.lineTo(s(25), s(11)); ctx.lineTo(s(22), s(14));
-                    ctx.stroke();
-                }
-                onClicked: window.applyRandomWallpaper()
+            WallpaperRandom.RandomWallpaperButton {
+                uiScale: window.s(1)
+                active: false
+                available: window.activeModel && window.activeModel.count > 0 && !window.isApplying
+                textColor: ThemeBackend.text
+                surface1Color: ThemeBackend.surface1
+                surface2Color: ThemeBackend.surface2
+                onTriggered: window.applyRandomWallpaper()
             }
             // END user-addon: serpantinum-v2 random wallpaper button
 
 '''
+    button_pattern = re.compile(
+        r"            // BEGIN user-addon: serpantinum-v2 random wallpaper button\n"
+        r".*?"
+        r"            // END user-addon: serpantinum-v2 random wallpaper button\n",
+        re.DOTALL,
+    )
+    if button_pattern.search(text):
+        return button_pattern.sub(button_block, text, count=1)
     return add_before(
         text,
         "            Item {\n                id: searchControlContainer",
@@ -452,6 +458,8 @@ def main() -> int:
         ADDONS_ROOT / "screenshot-freeze/ScreenshotFreezeCard.qml": QS_DIR / "settings/ScreenshotFreezeCard.qml",
         ADDONS_ROOT / "music-preview-rounded/MusicVisualizerCard.qml": QS_DIR / "settings/MusicVisualizerCard.qml",
         ADDONS_ROOT / "idle-inhibit/IdleInhibitCard.qml": QS_DIR / "settings/IdleInhibitCard.qml",
+        ADDONS_ROOT / "wallpaper-random/RandomWallpaperButton.qml": QS_DIR / "wallpaper/RandomWallpaperButton.qml",
+        ADDONS_ROOT / "wallpaper-random/random.svg": QS_DIR / "wallpaper/random.svg",
     }
     alarm_source = ADDONS_ROOT / "custom-alarm-clock"
     for source in alarm_source.iterdir():
