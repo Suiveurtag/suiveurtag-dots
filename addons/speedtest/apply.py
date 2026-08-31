@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -634,15 +635,16 @@ def patch_popup(text: str) -> str:
     text = text.replace(OLD_RUN_HANDLER, "")
 
     if "BEGIN user-addon: speedtest state" not in text:
-        anchor = '    readonly property string scriptsDir: Quickshell.env("HOME") + "/.config/hypr/scripts/quickshell/network"\n'
-        if anchor not in text:
+        anchor_match = re.search(r'^    readonly property string scriptsDir: .*$', text, re.MULTILINE)
+        if not anchor_match:
             raise PatchError("network scriptsDir anchor not found")
+        anchor = anchor_match.group(0) + "\n"
         text = text.replace(anchor, anchor + "\n" + STATE_BLOCK, 1)
 
     if "BEGIN user-addon: speedtest panel" not in text:
-        anchor = "            Rectangle {\n                id: bottomTabsContainer\n"
+        anchor = "            Switch {\n                id: bottomSwitch\n"
         if anchor not in text:
-            raise PatchError("bottom tabs anchor not found")
+            raise PatchError("bottom network switch anchor not found")
         text = text.replace(anchor, SPEEDTEST_COMPONENT_BLOCK + anchor, 1)
 
     if "BEGIN user-addon: speedtest button" not in text:

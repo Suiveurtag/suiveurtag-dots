@@ -1,0 +1,10 @@
+[Unit]
+Description=Watch Serpantinum updates for Suiveurtag addon reapplication
+
+[Path]
+PathChanged=%h/.local/state/serpantinum/version
+PathChanged=%h/.local/share/serpantinum/src/quickshell/Shell.qml
+Unit=serpantinum-addons.service
+
+[Install]
+WantedBy=default.target

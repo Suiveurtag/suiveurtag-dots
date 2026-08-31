@@ -21,6 +21,7 @@ XDG_CONFIG_HOME = Path(os.environ.get("XDG_CONFIG_HOME", HOME / ".config")).expa
 XDG_CACHE_HOME = Path(os.environ.get("XDG_CACHE_HOME", HOME / ".cache")).expanduser()
 XDG_RUNTIME_DIR = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")).expanduser()
 HYPR_BASE = Path(os.environ.get("HYPR_CONFIG_DIR", XDG_CONFIG_HOME / "hypr")).expanduser()
+V2_SETTINGS = XDG_CONFIG_HOME / "serpantinum/settings.json"
 QS_DIR = Path(
     os.environ.get("HYPR_QUICKSHELL_DIR", HYPR_BASE / "scripts/quickshell")
 ).expanduser()
@@ -30,7 +31,12 @@ SETTINGS_POPUP = Path(
         QS_DIR / "settings/SettingsPopup.qml",
     )
 ).expanduser()
-SETTINGS = Path(os.environ.get("HYPR_SETTINGS", HYPR_BASE / "settings.json")).expanduser()
+SETTINGS = Path(
+    os.environ.get(
+        "HYPR_SETTINGS",
+        V2_SETTINGS if V2_SETTINGS.is_file() else HYPR_BASE / "settings.json",
+    )
+).expanduser()
 MATUGEN_BASE = Path(
     os.environ.get("MATUGEN_CONFIG_DIR", XDG_CONFIG_HOME / "matugen")
 ).expanduser()
@@ -43,6 +49,8 @@ MATUGEN_TEMPLATE = Path(
         MATUGEN_BASE / "templates/qs_colors.json.template",
     )
 ).expanduser()
+XDG_STATE_HOME = Path(os.environ.get("XDG_STATE_HOME", HOME / ".local/state")).expanduser()
+QS_COLOR_OUTPUT = XDG_STATE_HOME / "serpantinum/qs_colors.json"
 WALLPAPER_CACHE = Path(
     os.environ.get(
         "MATUGEN_WALLPAPER_CACHE",
@@ -71,7 +79,7 @@ LOCK_FILE = XDG_RUNTIME_DIR / "quickshell-addons-settings.lock"
 TEMPLATE_MARKER = '"_matugenVibrantAddon": true'
 TYPE_BEGIN = "# BEGIN user-addon: matugen-vibrant scheme"
 TYPE_END = "# END user-addon: matugen-vibrant scheme"
-TYPE_BLOCK = f'{TYPE_BEGIN}\ntype = "SchemeVibrant"\n{TYPE_END}\n'
+TYPE_BLOCK = f'{TYPE_BEGIN}\ntype = "SchemeFruitSalad"\n{TYPE_END}\n'
 TYPE_BLOCK_RE = re.compile(
     rf"^[ \t]*{re.escape(TYPE_BEGIN)}\n.*?^[ \t]*{re.escape(TYPE_END)}\n?",
     flags=re.MULTILINE | re.DOTALL,
@@ -170,6 +178,11 @@ def replace_once(text: str, pattern: str, replacement: str, description: str) ->
 
 
 def patch_settings_popup(text: str) -> str:
+    # Serpantinium V2 owns the addon page through AddonSettingsPage.qml.
+    # The legacy injection anchors do not exist in that popup and must not
+    # prevent the Matugen template/state toggle from being applied.
+    if 'source: "AddonSettingsPage.qml"' in text:
+        return text
     if "BEGIN user-addon: matugen-vibrant card" in text:
         if "BEGIN user-addon: matugen-vibrant import" not in text:
             import_match = re.search(r'(?m)^import "\.\./"\s*$', text)
@@ -366,10 +379,27 @@ def load_type_state() -> dict:
 
 
 def patch_matugen_config(text: str, enabled: bool) -> str:
+    # ThemeBackend V2 watches Serpantinium's state file, not the legacy Hypr
+    # Quickshell output path.
+    section_start, section_end = section_bounds(text, "templates.quickshell")
+    section = text[section_start:section_end]
+    output_match = re.search(r'(?m)^[ \t]*output_path\s*=\s*.*$', section)
+    if output_match:
+        output_line = f'output_path = "{QS_COLOR_OUTPUT}"'
+        current_line = output_match.group(0)
+        if current_line != output_line:
+            absolute_start = section_start + output_match.start()
+            absolute_end = section_start + output_match.end()
+            text = text[:absolute_start] + output_line + text[absolute_end:]
     has_marker = TYPE_BEGIN in text
     if enabled:
         if has_marker:
-            return text
+            return re.sub(
+                rf'({re.escape(TYPE_BEGIN)}\n)type\s*=\s*"[^"]+"',
+                rf'\1type = "SchemeFruitSalad"',
+                text,
+                count=1,
+            )
         section_start, section_end = section_bounds(text, "templates.quickshell")
         section = text[section_start:section_end]
         type_match = re.search(r"(?m)^[ \t]*type\s*=.*$", section)

@@ -4,6 +4,7 @@ import QtQuick.Controls
 import Quickshell
 import Quickshell.Io
 import "../"
+import "../singletons"
 
 Item {
     id: root
@@ -14,17 +15,9 @@ Item {
     property real layoutWidth: width
     property real layoutHeight: height
 
-    Scaler {
-        id: scaler
-        currentWidth: Screen.width
-        currentHeight: Screen.height
-    }
-
     function s(value) {
-        return scaler.s(value)
+        return Scaler.s(value)
     }
-
-    MatugenColors { id: theme }
 
     readonly property var categories: [
         { name: "All", icon: "󰞅" },
@@ -50,7 +43,7 @@ Item {
     Process {
         id: emojiReader
         running: true
-        command: ["cat", Quickshell.env("HOME") + "/.config/hypr/scripts/quickshell/emoji/emojis.json"]
+        command: ["cat", Caching.qsDir + "/emoji/emojis.json"]
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
@@ -200,9 +193,9 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: root.s(18)
-        color: theme.base
+        color: ThemeBackend.base
         border.width: 1
-        border.color: theme.surface1
+        border.color: ThemeBackend.surface1
         clip: true
 
         Rectangle {
@@ -211,7 +204,7 @@ Item {
             radius: width / 2
             x: -width * 0.2
             y: -height * 0.45
-            color: theme.mauve
+            color: ThemeBackend.mauve
             opacity: 0.055
         }
 
@@ -221,7 +214,7 @@ Item {
             radius: width / 2
             x: parent.width - width * 0.75
             y: parent.height - height * 0.42
-            color: theme.blue
+            color: ThemeBackend.blue
             opacity: 0.045
         }
 
@@ -236,7 +229,7 @@ Item {
 
                 Text {
                     text: "󰞅"
-                    color: theme.mauve
+                    color: ThemeBackend.mauve
                     font.family: "Iosevka Nerd Font"
                     font.pixelSize: root.s(22)
                 }
@@ -246,18 +239,18 @@ Item {
                     Layout.fillWidth: true
                     Layout.preferredHeight: root.s(46)
                     focus: true
-                    color: theme.text
+                    color: ThemeBackend.text
                     placeholderText: "Search emojis..."
-                    placeholderTextColor: theme.subtext0
+                    placeholderTextColor: ThemeBackend.subtext0
                     font.family: "JetBrains Mono"
                     font.pixelSize: root.s(14)
                     leftPadding: root.s(14)
                     rightPadding: root.s(14)
                     background: Rectangle {
                         radius: root.s(12)
-                        color: theme.surface0
+                        color: ThemeBackend.surface0
                         border.width: searchInput.activeFocus ? 1 : 0
-                        border.color: theme.mauve
+                        border.color: ThemeBackend.mauve
                     }
 
                     onTextChanged: root.filterEmoji()
@@ -293,12 +286,12 @@ Item {
                     Layout.preferredWidth: root.s(104)
                     Layout.preferredHeight: root.s(38)
                     radius: root.s(10)
-                    color: copied ? theme.green : theme.surface0
+                    color: copied ? ThemeBackend.green : ThemeBackend.surface0
 
                     Text {
                         anchors.centerIn: parent
                         text: copied ? "Copied" : emojiModel.count + " emoji"
-                        color: copied ? theme.crust : theme.subtext0
+                        color: copied ? ThemeBackend.crust : ThemeBackend.subtext0
                         font.family: "JetBrains Mono"
                         font.pixelSize: root.s(11)
                         font.weight: Font.DemiBold
@@ -328,13 +321,13 @@ Item {
                             width: categoryLabel.implicitWidth + root.s(26)
                             height: root.s(38)
                             radius: root.s(10)
-                            color: root.activeCategory === modelData.name ? theme.mauve : theme.surface0
+                            color: root.activeCategory === modelData.name ? ThemeBackend.mauve : ThemeBackend.surface0
 
                             Text {
                                 id: categoryLabel
                                 anchors.centerIn: parent
                                 text: modelData.icon
-                                color: root.activeCategory === modelData.name ? theme.crust : theme.text
+                                color: root.activeCategory === modelData.name ? ThemeBackend.crust : ThemeBackend.text
                                 font.family: "Iosevka Nerd Font"
                                 font.pixelSize: root.s(17)
                             }
@@ -357,7 +350,7 @@ Item {
             Rectangle {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 1
-                color: theme.surface1
+                color: ThemeBackend.surface1
                 opacity: 0.65
             }
 
@@ -386,7 +379,7 @@ Item {
                         anchors.fill: parent
                         anchors.margins: root.s(4)
                         radius: root.s(13)
-                        color: theme.mauve
+                        color: ThemeBackend.mauve
                         opacity: 0.9
                         scale: 0.94
 
@@ -444,7 +437,7 @@ Item {
                     contentItem: Rectangle {
                         implicitWidth: root.s(4)
                         radius: width / 2
-                        color: theme.surface2
+                        color: ThemeBackend.surface2
                     }
                 }
             }

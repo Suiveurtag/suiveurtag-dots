@@ -43,7 +43,7 @@ QUICKSHELL_DIR="$(resolve_quickshell_dir)"
 WALLPAPER_PICKER="$QUICKSHELL_DIR/wallpaper/WallpaperPicker.qml"
 QS_MANAGER="$HYPR_BASE/scripts/qs_manager.sh"
 WINDOW_REGISTRY="$QUICKSHELL_DIR/WindowRegistry.js"
-HYPR_SETTINGS="${HYPR_SETTINGS:-$HYPR_BASE/settings.json}"
+HYPR_SETTINGS="${HYPR_SETTINGS:-${XDG_CONFIG_HOME:-$HOME/.config}/serpantinum/settings.json}"
 MATUGEN_SETTINGS_POPUP="$QUICKSHELL_DIR/settings/SettingsPopup.qml"
 MATUGEN_CONFIG="${MATUGEN_CONFIG:-$MATUGEN_BASE/config.toml}"
 MATUGEN_QS_TEMPLATE="${MATUGEN_QS_TEMPLATE:-$MATUGEN_BASE/templates/qs_colors.json.template}"
@@ -73,7 +73,8 @@ install_addon() {
 
     mkdir -p "$dst"
     cp -a "$src/." "$dst/"
-    chmod +x "$dst/apply.sh" "$dst/apply.py"
+    [[ -f "$dst/apply.sh" ]] && chmod +x "$dst/apply.sh"
+    [[ -f "$dst/apply.py" ]] && chmod +x "$dst/apply.py"
     if [[ -f "$dst/zoomit.py" ]]; then
         chmod +x "$dst/zoomit.py"
     fi
@@ -152,6 +153,71 @@ repair_wallpaper_backend() {
             "$file"
     done
 }
+
+install_serpantinum_v2_addons() {
+    local serpantinum_home="${SERPANTINUM_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/serpantinum}"
+    local serpantinum_qs="$serpantinum_home/src/quickshell"
+
+    info() { printf '  • %s\n' "$*"; }
+    info "Serpantinum V2 detected at $serpantinum_home"
+
+    local addon
+    for addon in \
+        emoji-picker \
+        zoomit \
+        launcher-web-search \
+        drawing-notes \
+        custom-alarm-clock \
+        serpantinum-settings \
+        matugen-vibrant \
+        screenshot-freeze \
+        music-preview-rounded \
+        idle-inhibit \
+        headset-mic-loopback \
+        captive-portal \
+        speedtest \
+        dns-mode-toggle \
+        tor-panel; do
+        install_addon "$addon"
+    done
+
+    cp "$REPO_DIR/scripts/apply-serpantinum-v2.py" "$ADDONS_DST/apply-serpantinum-v2.py"
+    chmod +x "$ADDONS_DST/apply-serpantinum-v2.py"
+
+    mkdir -p "$SYSTEMD_DST"
+    for unit in \
+        serpantinum-addons.path \
+        serpantinum-addons.service \
+        hypr-zoomit.service \
+        tor-panel-tor.service; do
+        sed \
+            -e "s#%h/.local/share/quickshell-addons#${ADDONS_DST}#g" \
+            "$SYSTEMD_SRC/$unit" > "$SYSTEMD_DST/$unit"
+    done
+
+    env \
+        XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}" \
+        XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}" \
+        SERPANTINUM_HOME="$serpantinum_home" \
+        "$ADDONS_DST/apply-serpantinum-v2.py"
+
+    if user_systemctl daemon-reload; then
+        user_systemctl enable --now serpantinum-addons.path hypr-zoomit.service
+    else
+        warn "user systemd session is unavailable; enable serpantinum-addons.path and hypr-zoomit.service after login"
+    fi
+
+    if command -v serpantinum >/dev/null 2>&1; then
+        serpantinum reload || warn "Serpantinum reload failed; use Super+R after installation"
+    fi
+
+    info "Serpantinum V2 addons installed"
+}
+
+if [[ -f "${SERPANTINUM_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/serpantinum}/src/quickshell/Shell.qml" ]]; then
+    install_serpantinum_v2_addons
+    exit 0
+fi
 
 install_addon "wallpaper-random"
 install_addon "emoji-picker"

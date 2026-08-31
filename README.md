@@ -10,7 +10,7 @@ This repo currently contains:
 - `zoomit`: smooth cursor-following magnifier and frozen-screen drawing overlay
 - `drawing-notes`: toggle the floating drawing widget between its canvas and an autosaved Markdown notepad
 - `screenshot-freeze`: optional Windows-style frozen screen while selecting a screenshot region
-- `idle-inhibit`: optional switch that disables automatic idle locking and suspension
+- `idle-inhibit`: Quick Settings shortcut linked to Serpantinum's native Idle System setting
 - `music-preview-rounded`: rounded album artwork and an optional CAVA visualizer in the Quickshell top bar
 - `topbar-button-effects`: optional press feedback and animated Matugen outlines for active top bar panels
 - `launcher-web-search`: press `Tab` in the app launcher to search the typed text with Zen
@@ -22,6 +22,8 @@ This repo currently contains:
 - `wifi-text-scroll`: smoothly scrolls a long active Wi-Fi name inside the network panel
 - `dns-mode-toggle`: animated per-connection switch between DHCP-provided and Mullvad DNS
 - `tor-panel`: isolated Tor network control and per-application routing on `Super+K`
+
+Serpantinum V2 integration also restores the separate left-side `Quick Settings` panel for addon controls, keybinds, and monitors. Its shortcuts are `Meta+P` for the main settings and `Meta+Shift+P` for Quick Settings.
 
 These addons are designed to stay isolated from the upstream dots:
 
@@ -83,11 +85,14 @@ The upstream ilyamiro installer is interactive, may request `sudo`, supports Arc
 - Alarm settings are stored under `~/.local/state/quickshell/custom-alarm-clock/`. The shared player and scheduler are singletons, so multi-monitor sessions produce one alarm rather than one per monitor.
 - In the audio panel's **Streams** tab, **Headset audio as microphone** creates a `Headset Audio` input from the current output. Select that input in Discord, OBS, or another recording app; turning the option off removes it.
 - When the current wallpaper is animated, the wallpaper picker shows a speaker button. It enables or mutes `mpvpaper` audio, remembers the choice, and applies it to subsequent animated wallpapers without changing the system volume.
-- Vibrant Matugen colors are opt-in under **Settings → Addons**. Enabling the option uses Matugen's vibrant scheme for Quickshell and maps the image-derived Base16 accents to the full UI palette with a small saturation boost.
+- Vibrant Matugen colors are opt-in under **Quick Settings → Addons**. Enabling the option uses the V2 Matugen pipeline and maps several image-derived source colors across the Quickshell accent palette, so colorful wallpapers retain distinct vivid accents instead of one dominant hue.
 - Frozen screenshot selection is enabled by default under **Settings → Addons → Freeze screen during selection**. It freezes regional screenshots, including edit mode, while full-screen screenshots remain instant and screen recording stays live.
 - The CAVA music visualizer is opt-in under **Settings → Addons → Music visualizer**. It replaces the previous/play/next buttons with a smooth Matugen-colored spectrum; click the spectrum to play or pause.
 - **Settings → Addons → Animated top bar buttons** is enabled by default. Mouse presses shrink and gray the button briefly; opening a panel by mouse or shortcut keeps a flowing Matugen gradient around its matching top bar button.
-- **Settings → Addons → Disable idle sleep and lock** stops `hypridle` immediately and removes it from startup. Turning the option off restores the daemon; manual locking and suspension remain available.
+- **Quick Settings → Enable idle system** is linked to the native **Settings → Idle → Enable Idle System** control and writes the same `idle.enabled` value.
+- **Quick Settings → Keybinds** edits are compiled into the active Hyprland Lua bindings, including French-layout-safe Meta shortcuts. Wallpaper and screenshot shortcuts therefore apply immediately after saving.
+- The system panel volume slider uses a two-color Matugen gradient, and the performance switcher uses distinct gradients for Performance, Balanced, and Power Saver.
+- **Settings → Bar** has separate time formats for the top bar clock (`bar.time.format`) and calendar panel clock (`calendar.time.format`).
 - The Matugen addon saves the latest upstream Quickshell color template before overriding it. Disabling the option restores that template, and the watcher repeats the process after dots updates.
 - ZoomIt-style shortcuts are added to **Settings → Keybinds** and can be edited there:
   - `Super+Alt+Z`: smoothly toggle a 2× cursor-following zoom. While active, use the wheel to zoom further in or return to 1×.

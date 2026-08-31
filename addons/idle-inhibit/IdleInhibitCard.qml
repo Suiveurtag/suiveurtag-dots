@@ -8,7 +8,7 @@ Rectangle {
 
     property real uiScale: 1
     property bool highlighted: false
-    property bool idleDisabled: false
+    readonly property bool idleEnabled: typeof Config !== "undefined" && Config.getSetting("idle", {}).enabled === true
     property bool applying: false
     property color accentColor: "#74c7ec"
     property color baseColor: "#1e1e2e"
@@ -24,14 +24,20 @@ Rectangle {
 
     readonly property string homeDir: Quickshell.env("HOME")
     readonly property string dataHome: Quickshell.env("XDG_DATA_HOME") || (homeDir + "/.local/share")
-    property string settingsPath: homeDir + "/.config/hypr/settings.json"
+    property string settingsPath: homeDir + "/.config/serpantinum/settings.json"
     readonly property string applyScript: dataHome + "/quickshell-addons/idle-inhibit/apply.sh"
 
     function toggle() {
         if (applying) return;
-        const requestedState = !idleDisabled;
-        idleDisabled = requestedState;
+        const requestedState = !idleEnabled;
         applying = true;
+        if (typeof Config !== "undefined" && Config.setSetting && Config.getSetting) {
+            const idle = Object.assign({}, Config.getSetting("idle", {}));
+            idle.enabled = requestedState;
+            Config.setSetting("idle", idle);
+            applying = false;
+            return;
+        }
         applyProcess.command = [applyScript, requestedState ? "--disable" : "--enable"];
         applyProcess.running = true;
     }
@@ -76,7 +82,7 @@ Rectangle {
             Layout.alignment: Qt.AlignVCenter
             spacing: root.s(3)
             Text {
-                text: "Disable idle sleep and lock"
+                text: "Enable idle system"
                 font.family: "Inter"
                 font.weight: Font.Medium
                 font.pixelSize: root.s(14)
@@ -84,7 +90,7 @@ Rectangle {
                 Layout.fillWidth: true
             }
             Text {
-                text: "Keep the session awake until this option is turned off"
+                text: "Allow automatic sleep and screen lock"
                 font.family: "Inter"
                 font.pixelSize: root.s(11)
                 color: root.highlighted ? Qt.alpha(root.baseColor, 0.75) : Qt.alpha(root.subtextColor, 0.7)
@@ -99,7 +105,7 @@ Rectangle {
             radius: root.s(11)
             scale: toggleMouse.containsMouse ? 1.05 : 1.0
             opacity: root.applying ? 0.55 : 1.0
-            color: root.idleDisabled
+            color: root.idleEnabled
                 ? (root.highlighted ? root.baseColor : root.accentColor)
                 : Qt.alpha(root.surface2Color, root.highlighted ? 0.4 : 1.0)
 
@@ -111,8 +117,8 @@ Rectangle {
                 height: root.s(16)
                 radius: root.s(8)
                 y: root.s(3)
-                x: root.idleDisabled ? root.s(21) : root.s(3)
-                color: root.idleDisabled
+                x: root.idleEnabled ? root.s(21) : root.s(3)
+                color: root.idleEnabled
                     ? (root.highlighted ? root.accentColor : root.baseColor)
                     : (root.highlighted ? root.accentColor : root.surface0Color)
                 Behavior on x { NumberAnimation { duration: 250; easing.type: Easing.OutBack } }
@@ -136,11 +142,35 @@ Rectangle {
             onStreamFinished: {
                 try {
                     const settings = JSON.parse(this.text || "{}");
-                    root.idleDisabled = settings.disableIdleTimeouts === true;
                 } catch (error) {
-                    root.idleDisabled = false;
                 }
             }
+        }
+    }
+
+    onSettingsPathChanged: {
+        if (settingsPath !== "") {
+            settingsReader.running = false;
+            settingsReader.running = true;
+        }
+    }
+
+    Connections {
+        target: typeof Config !== "undefined" ? Config : null
+        function onRawSettingsChanged() {
+            const idle = Config.getSetting("idle", {});
+        }
+        function onSettingsLoaded() {
+            const idle = Config.getSetting("idle", {});
+        }
+    }
+
+    Timer {
+        interval: 250
+        repeat: true
+        running: typeof Config !== "undefined"
+        onTriggered: {
+            const idle = Config.getSetting("idle", {});
         }
     }
 
@@ -148,7 +178,7 @@ Rectangle {
         id: applyProcess
         onExited: exitCode => {
             root.applying = false;
-            if (exitCode !== 0) root.idleDisabled = !root.idleDisabled;
+            if (exitCode !== 0) settingsReader.running = true;
             settingsReader.running = false;
             settingsReader.running = true;
         }

@@ -68,13 +68,13 @@ def patch_volume_popup(text: str) -> str:
 {indent}    height: implicitHeight
 {indent}    visible: window.activeTab === "apps"
 {indent}    uiScale: window.s(1)
-{indent}    accentColor: window.green
-{indent}    baseColor: window.base
-{indent}    textColor: window.text
-{indent}    subtextColor: window.subtext0
-{indent}    surface0Color: window.surface0
-{indent}    surface1Color: window.surface1
-{indent}    surface2Color: window.surface2
+{indent}    accentColor: ThemeBackend.green
+{indent}    baseColor: ThemeBackend.base
+{indent}    textColor: ThemeBackend.text
+{indent}    subtextColor: ThemeBackend.subtext0
+{indent}    surface0Color: ThemeBackend.surface0
+{indent}    surface1Color: ThemeBackend.surface1
+{indent}    surface2Color: ThemeBackend.surface2
 {indent}}}
 {indent}{CARD_END}
 

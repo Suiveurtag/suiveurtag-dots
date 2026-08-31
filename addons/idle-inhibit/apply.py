@@ -19,7 +19,8 @@ XDG_CONFIG_HOME = Path(os.environ.get("XDG_CONFIG_HOME", HOME / ".config")).expa
 XDG_DATA_HOME = Path(os.environ.get("XDG_DATA_HOME", HOME / ".local/share")).expanduser()
 XDG_RUNTIME_DIR = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"))
 HYPR_BASE = Path(os.environ.get("HYPR_CONFIG_DIR", XDG_CONFIG_HOME / "hypr")).expanduser()
-SETTINGS = Path(os.environ.get("HYPR_SETTINGS", HYPR_BASE / "settings.json")).expanduser()
+V2_SETTINGS = HOME / ".config" / "serpantinum" / "settings.json"
+SETTINGS = Path(os.environ.get("HYPR_SETTINGS", V2_SETTINGS if V2_SETTINGS.is_file() else HYPR_BASE / "settings.json")).expanduser()
 SETTINGS_WATCHER = HYPR_BASE / "scripts" / "settings_watcher.sh"
 AUTOSTART_CONF = HYPR_BASE / "config" / "autostart.conf"
 ADDON_DIR = XDG_DATA_HOME / "quickshell-addons" / "idle-inhibit"
@@ -57,6 +58,16 @@ def write_setting(disabled: bool | None) -> tuple[bool, bool]:
         raise ApplyError(f"invalid settings.json: {error}") from error
     if not isinstance(data, dict):
         raise ApplyError("settings.json root is not an object")
+
+    if SETTINGS == V2_SETTINGS or isinstance(data.get("idle"), dict):
+        idle = data.setdefault("idle", {})
+        requested = bool(idle.get("manualInhibit", False)) if disabled is None else disabled
+        changed = idle.get("manualInhibit") is not requested
+        idle["manualInhibit"] = requested
+        if changed:
+            backup(SETTINGS)
+            atomic_write(SETTINGS, json.dumps(data, ensure_ascii=False, indent=2) + "\n")
+        return changed, requested
 
     setting_existed = "disableIdleTimeouts" in data
     requested = data.get("disableIdleTimeouts") is True if disabled is None else disabled
@@ -167,9 +178,10 @@ def main() -> int:
         fcntl.flock(lock, fcntl.LOCK_EX)
         explicit = True if args.disable else False if args.enable else None
         changed, disabled = write_setting(explicit)
-        if changed:
+        if changed and SETTINGS != V2_SETTINGS:
             compile_settings(disabled)
-        sync_hypridle(disabled)
+        if SETTINGS != V2_SETTINGS:
+            sync_hypridle(disabled)
     print("idle-inhibit: " + ("updated idle option" if changed else "addon already installed"))
     return 0
 

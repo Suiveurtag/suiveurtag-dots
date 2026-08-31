@@ -175,76 +175,42 @@ def install_assets() -> bool:
 
 def patch_popup(text: str) -> str:
     if "BEGIN user-addon: captive-portal state" not in text:
-        anchor = '    readonly property string scriptsDir: Quickshell.env("HOME") + "/.config/hypr/scripts/quickshell/network"\n'
-        if anchor not in text:
+        anchor_match = re.search(r'^    readonly property string scriptsDir: .*$', text, re.MULTILINE)
+        if not anchor_match:
             raise PatchError("network scriptsDir anchor not found")
+        anchor = anchor_match.group(0) + "\n"
         text = text.replace(anchor, anchor + "\n" + STATE_BLOCK, 1)
 
-    wifi_info_anchor = (
-        '                    if (obj.ip) nodes.push({ id: "ip_" + i, name: obj.ip, icon: "󰩟", action: "IP Address", isInfoNode: true, isActionable: true, parentIndex: cIndex });\n'
-        '                    if (obj.freq) nodes.push({ id: "freq_" + i, name: obj.freq, icon: "󰖧", action: "Band", isInfoNode: true, isActionable: false, parentIndex: cIndex });\n'
-    )
     if "portal_action_" not in text:
-        if wifi_info_anchor not in text:
-            raise PatchError("wifi info anchor not found")
-        text = text.replace(wifi_info_anchor, wifi_info_anchor + WIFI_INFO_BLOCK, 1)
-
-    wifi_list_anchor = '                newNetworks.push({ id: "action_settings", ssid: "Current Device", mac: "", name: "Current Device", icon: "󰒓", security: "", action: "View Info", isInfoNode: false, isActionable: true, cmdStr: "TOGGLE_VIEW", parentIndex: -1 });\n'
-    if 'id: "action_portal"' not in text:
-        if wifi_list_anchor not in text:
-            raise PatchError("wifi list action anchor not found")
-        text = text.replace(wifi_list_anchor, wifi_list_anchor + "\n" + WIFI_LIST_BLOCK, 1)
-
-    wifi_tab_anchor = """                            Text { font.family: "Iosevka Nerd Font"; font.pixelSize: window.s(18); color: window.activeMode === "wifi" ? window.crust : window.text; text: "󰤨"; Behavior on color { ColorAnimation{duration:200} } }
-                            Text { font.family: "JetBrains Mono"; font.weight: Font.Black; font.pixelSize: window.s(13); color: window.activeMode === "wifi" ? window.crust : window.text; text: "Wi-Fi"; Behavior on color { ColorAnimation{duration:200} } }
-"""
-    if "visible: window.captivePortalNeedsAttention" not in text:
-        if wifi_tab_anchor not in text:
-            raise PatchError("wifi tab badge anchor not found")
-        text = text.replace(wifi_tab_anchor, wifi_tab_anchor + WIFI_TAB_BADGE, 1)
-
-    wifi_handler = re.compile(
-        r"(    onWifiConnectedChanged: \{\n"
-        r"        if \(window\.wifiConnected && window\.wifiConnected\.ssid\) \{ cache\.lastWifiSsid = window\.wifiConnected\.ssid; \}\n"
-        r"        syncCores\(\);\n"
-        r"        if \(window\.currentConn && window\.activeMode === \"wifi\"\) updateInfoNodes\(\);\n"
-        r"    \}\n)"
-    )
-    if "triggerCaptivePortalPoll();" not in text:
-        match = wifi_handler.search(text)
-        if not match:
-            raise PatchError("onWifiConnectedChanged block not found")
-        replacement = (
-            "    onWifiConnectedChanged: {\n"
-            "        if (window.wifiConnected && window.wifiConnected.ssid) { cache.lastWifiSsid = window.wifiConnected.ssid; }\n"
-            "        syncCores();\n"
-            "        if (window.isWifiConn) {\n"
-            "            triggerCaptivePortalPoll();\n"
-            "        } else {\n"
-            "            window.captivePortalState = \"offline\";\n"
-            "            window.captivePortalUrl = \"\";\n"
-            "            window.captivePortalHost = \"\";\n"
-            "            window.captivePortalMessage = \"\";\n"
-            "        }\n"
-            "        if (window.currentConn && window.activeMode === \"wifi\") updateInfoNodes();\n"
-            "    }\n"
+        wifi_info_match = re.search(
+            r'(?m)^\s*if \(obj\.freq\) nodes\.push\(\{ id: "freq_" \+ i,.*$',
+            text,
         )
-        text = text[: match.start()] + replacement + text[match.end() :]
+        if not wifi_info_match:
+            raise PatchError("wifi info anchor not found")
+        insertion = wifi_info_match.end()
+        text = text[:insertion] + "\n" + WIFI_INFO_BLOCK + text[insertion:]
 
-    wifi_mode_anchor = """        window.pendingWifiId = ""; window.pendingWifiSsid = "";
-        if (window.activeMode === "wifi") savedNetworksFetcher.running = true;
-"""
-    if 'if (window.activeMode === "wifi") {\n            savedNetworksFetcher.running = true;\n            triggerCaptivePortalPoll();\n        }' not in text:
-        if wifi_mode_anchor not in text:
-            raise PatchError("activeMode wifi anchor not found")
+    if 'id: "action_portal"' not in text:
+        wifi_list_match = re.search(
+            r'(?m)^\s*newNetworks\.push\(\{ id: "action_settings",.*$',
+            text,
+        )
+        if not wifi_list_match:
+            raise PatchError("wifi list action anchor not found")
+        insertion = wifi_list_match.end()
+        text = text[:insertion] + "\n" + WIFI_LIST_BLOCK + text[insertion:]
+
+    handler_marker = "// user-addon: captive-portal connection poll"
+    if handler_marker not in text:
+        handler_anchor = "    onWifiConnectedChanged: {\n"
+        if handler_anchor not in text:
+            raise PatchError("onWifiConnectedChanged block not found")
         text = text.replace(
-            wifi_mode_anchor,
-            """        window.pendingWifiId = ""; window.pendingWifiSsid = "";
-        if (window.activeMode === "wifi") {
-            savedNetworksFetcher.running = true;
-            triggerCaptivePortalPoll();
-        }
-""",
+            handler_anchor,
+            handler_anchor
+            + "        // user-addon: captive-portal connection poll\n"
+            + "        if (window.isWifiConn) triggerCaptivePortalPoll();\n",
             1,
         )
 

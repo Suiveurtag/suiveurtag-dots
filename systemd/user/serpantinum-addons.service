@@ -1,0 +1,7 @@
+[Unit]
+Description=Reapply Suiveurtag addons to Serpantinum V2
+After=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/share/quickshell-addons/apply-serpantinum-v2.py

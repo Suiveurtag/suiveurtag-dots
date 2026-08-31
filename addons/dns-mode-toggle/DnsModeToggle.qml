@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import QtQuick.Effects
 import Quickshell
 import Quickshell.Io
+import "../singletons"
 
 Item {
     id: root
@@ -17,10 +18,10 @@ Item {
 
     readonly property string displayedMode: busy && pendingMode !== "" ? pendingMode : mode
     readonly property bool isMullvad: displayedMode === "mullvad"
-    readonly property color homeAccent: rootWindow.sapphire
-    readonly property color homeSecondary: rootWindow.blue
-    readonly property color mullvadAccent: rootWindow.mauve
-    readonly property color mullvadSecondary: rootWindow.pink
+    readonly property color homeAccent: ThemeBackend.sapphire
+    readonly property color homeSecondary: ThemeBackend.blue
+    readonly property color mullvadAccent: ThemeBackend.mauve
+    readonly property color mullvadSecondary: ThemeBackend.pink
     readonly property color currentAccent: isMullvad ? mullvadAccent : homeAccent
     readonly property color currentSecondary: isMullvad ? mullvadSecondary : homeSecondary
 

@@ -639,6 +639,27 @@ def launch(command: str) -> None:
         tor_launch(app)
 
 
+def launch_desktop(desktop_id: str) -> None:
+    # Quickshell's DesktopEntry.id is version-dependent: some releases expose
+    # the filename with `.desktop`, others expose the same id without it.
+    wanted = str(desktop_id).strip()
+    candidates = {wanted}
+    if wanted.endswith(".desktop"):
+        candidates.add(wanted[:-8])
+    else:
+        candidates.add(wanted + ".desktop")
+    app = next(
+        (item for item in application_catalog() if item["desktopId"] in candidates),
+        None,
+    )
+    if app is None:
+        raise TorPanelError(f"Desktop entry not found: {desktop_id}")
+    if app.get("routed"):
+        tor_launch(app)
+    else:
+        direct_launch(app["exec"])
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -654,7 +675,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("new-identity")
     launch_parser = subparsers.add_parser("launch")
-    launch_parser.add_argument("--exec", dest="exec_command", required=True)
+    launch_group = launch_parser.add_mutually_exclusive_group(required=True)
+    launch_group.add_argument("--exec", dest="exec_command")
+    launch_group.add_argument("--desktop-id", dest="desktop_id")
     return parser
 
 
@@ -682,7 +705,10 @@ def main() -> int:
         elif args.command == "new-identity":
             emit(new_identity())
         elif args.command == "launch":
-            launch(args.exec_command)
+            if args.desktop_id:
+                launch_desktop(args.desktop_id)
+            else:
+                launch(args.exec_command)
         return 0
     except (OSError, ValueError, TorPanelError, subprocess.SubprocessError) as error:
         message = str(error) or error.__class__.__name__

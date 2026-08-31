@@ -5,6 +5,7 @@ import QtQuick.Effects
 import Quickshell
 import Quickshell.Io
 import "../"
+import "../singletons"
 
 Item {
     id: root
@@ -15,37 +16,29 @@ Item {
     property real layoutWidth: width
     property real layoutHeight: height
 
-    Scaler {
-        id: scaler
-        currentWidth: Screen.width
-        currentHeight: Screen.height
-    }
-
     function s(value) {
-        return scaler.s(value)
+        return Scaler.s(value)
     }
 
-    MatugenColors { id: theme }
-
-    readonly property color base: theme.base
-    readonly property color mantle: theme.mantle
-    readonly property color crust: theme.crust
-    readonly property color text: theme.text
-    readonly property color subtext0: theme.subtext0
-    readonly property color subtext1: theme.subtext1
-    readonly property color surface0: theme.surface0
-    readonly property color surface1: theme.surface1
-    readonly property color surface2: theme.surface2
-    readonly property color overlay0: theme.overlay0
-    readonly property color mauve: theme.mauve
-    readonly property color pink: theme.pink
-    readonly property color sapphire: theme.sapphire
-    readonly property color blue: theme.blue
-    readonly property color teal: theme.teal
-    readonly property color green: theme.green
-    readonly property color peach: theme.peach
-    readonly property color yellow: theme.yellow
-    readonly property color red: theme.red
+    readonly property color base: ThemeBackend.base
+    readonly property color mantle: ThemeBackend.mantle
+    readonly property color crust: ThemeBackend.crust
+    readonly property color text: ThemeBackend.text
+    readonly property color subtext0: ThemeBackend.subtext0
+    readonly property color subtext1: ThemeBackend.subtext1
+    readonly property color surface0: ThemeBackend.surface0
+    readonly property color surface1: ThemeBackend.surface1
+    readonly property color surface2: ThemeBackend.surface2
+    readonly property color overlay0: ThemeBackend.overlay0
+    readonly property color mauve: ThemeBackend.mauve
+    readonly property color pink: ThemeBackend.pink
+    readonly property color sapphire: ThemeBackend.sapphire
+    readonly property color blue: ThemeBackend.blue
+    readonly property color teal: ThemeBackend.teal
+    readonly property color green: ThemeBackend.green
+    readonly property color peach: ThemeBackend.peach
+    readonly property color yellow: ThemeBackend.yellow
+    readonly property color red: ThemeBackend.red
 
     readonly property string homeDir: Quickshell.env("HOME")
     readonly property string xdgDataHome: Quickshell.env("XDG_DATA_HOME")

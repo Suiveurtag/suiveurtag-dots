@@ -24,7 +24,7 @@ Rectangle {
 
     readonly property string homeDir: Quickshell.env("HOME")
     readonly property string dataHome: Quickshell.env("XDG_DATA_HOME") || (homeDir + "/.local/share")
-    property string settingsPath: homeDir + "/.config/hypr/settings.json"
+    property string settingsPath: homeDir + "/.config/serpantinum/settings.json"
     readonly property string applyScript: dataHome + "/quickshell-addons/matugen-vibrant/apply.sh"
 
     function toggle() {
