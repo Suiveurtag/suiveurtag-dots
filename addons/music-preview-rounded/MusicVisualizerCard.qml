@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
+import "../reusables"
 
 Rectangle {
     id: root
@@ -83,34 +84,17 @@ Rectangle {
             }
         }
 
-        Rectangle {
+        Toggle {
             Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
-            Layout.preferredWidth: root.s(40)
-            Layout.preferredHeight: root.s(22)
-            radius: root.s(11)
-            opacity: root.applying ? 0.55 : 1.0
-            color: root.visualizerEnabled
-                ? (root.highlighted ? root.baseColor : root.accentColor)
-                : Qt.alpha(root.surface2Color, root.highlighted ? 0.4 : 1.0)
-
-            Rectangle {
-                width: root.s(16)
-                height: root.s(16)
-                radius: root.s(8)
-                y: root.s(3)
-                x: root.visualizerEnabled ? root.s(21) : root.s(3)
-                color: root.visualizerEnabled
-                    ? (root.highlighted ? root.accentColor : root.baseColor)
-                    : (root.highlighted ? root.accentColor : root.surface0Color)
-                Behavior on x { NumberAnimation { duration: 250; easing.type: Easing.OutBack } }
-            }
-
-            MouseArea {
-                anchors.fill: parent
-                enabled: !root.applying
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.toggle()
-            }
+            checked: root.visualizerEnabled
+            enabled: !root.applying
+            accentColor: root.highlighted ? root.baseColor : root.accentColor
+            baseColor: root.surface1Color
+            handleColor: root.highlighted ? root.accentColor : root.baseColor
+            handleOffColor: root.highlighted ? root.accentColor : root.textColor
+            textColor: root.highlighted ? root.baseColor : root.textColor
+            toggleSound: "reusables/toggle/sfx.wav"
+            onToggled: root.toggle()
         }
     }
 

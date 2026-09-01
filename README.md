@@ -25,6 +25,14 @@ This repo currently contains:
 
 Serpantinum V2 integration also restores the separate left-side `Quick Settings` panel for addon controls, keybinds, and monitors. Its shortcuts are `Meta+P` for the main settings and `Meta+Shift+P` for Quick Settings.
 
+The Serpantinum V2 installer also maintains the following panel and wallpaper-picker changes:
+
+- the System panel can replace Hibernate with Logout and show the PC uptime in the action area; both options are independently toggleable in addon settings
+- the secondary addon settings page contains the animated selector for Matugen colors (`Off`, `Normal`, and `Vivid`), with the Music Visualizer entry removed
+- the System panel performance switcher uses the live Matugen palette with gradients: red/peach/pink for Performance, blue/sapphire/mauve for Balanced, and green/teal/yellow for Power Saver
+- wallpaper navigation accepts the four arrow keys (`← ↑ ↓ →`) without applying a wallpaper; Enter applies the centered selection, and Tab cycles deterministically through categories with `Search → All`
+- wallpaper selection uses the existing centered `ListView` highlight animation instead of forcing an immediate layout reposition
+
 These addons are designed to stay isolated from the upstream dots:
 
 - addon code lives in `~/.local/share/quickshell-addons/...`
@@ -91,7 +99,7 @@ The upstream ilyamiro installer is interactive, may request `sudo`, supports Arc
 - **Settings → Addons → Animated top bar buttons** is enabled by default. Mouse presses shrink and gray the button briefly; opening a panel by mouse or shortcut keeps a flowing Matugen gradient around its matching top bar button.
 - **Quick Settings → Enable idle system** is linked to the native **Settings → Idle → Enable Idle System** control and writes the same `idle.enabled` value.
 - **Quick Settings → Keybinds** edits are compiled into the active Hyprland Lua bindings, including French-layout-safe Meta shortcuts. Wallpaper and screenshot shortcuts therefore apply immediately after saving.
-- The system panel volume slider uses a two-color Matugen gradient, and the performance switcher uses distinct gradients for Performance, Balanced, and Power Saver.
+- The system panel volume slider uses a two-color Matugen gradient, and the performance switcher uses live Matugen gradients for Performance, Balanced, and Power Saver.
 - **Settings → Bar** has separate time formats for the top bar clock (`bar.time.format`) and calendar panel clock (`calendar.time.format`).
 - The Matugen addon saves the latest upstream Quickshell color template before overriding it. Disabling the option restores that template, and the watcher repeats the process after dots updates.
 - ZoomIt-style shortcuts are added to **Settings → Keybinds** and can be edited there:

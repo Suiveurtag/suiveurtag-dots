@@ -3,7 +3,7 @@ set -euo pipefail
 
 ADDON_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/quickshell-addons/matugen-vibrant"
 
-if [[ "${1:-}" != "--enable" && "${1:-}" != "--disable" ]]; then
+if [[ "${1:-}" != "--enable" && "${1:-}" != "--disable" && "${1:-}" != "--mode" ]]; then
     sleep "${MATUGEN_VIBRANT_APPLY_DELAY:-2}"
 fi
 

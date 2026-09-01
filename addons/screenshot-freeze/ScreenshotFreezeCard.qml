@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
+import "../reusables"
 
 Rectangle {
     id: root
@@ -92,40 +93,17 @@ Rectangle {
             }
         }
 
-        Rectangle {
+        Toggle {
             Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
-            Layout.preferredWidth: root.s(40)
-            Layout.preferredHeight: root.s(22)
-            radius: root.s(11)
-            scale: toggleMouse.containsMouse ? 1.05 : 1.0
-            opacity: root.applying ? 0.55 : 1.0
-            color: root.freezeEnabled
-                ? (root.highlighted ? root.baseColor : root.accentColor)
-                : Qt.alpha(root.surface2Color, root.highlighted ? 0.4 : 1.0)
-
-            Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutBack } }
-            Behavior on color { ColorAnimation { duration: 220; easing.type: Easing.OutExpo } }
-
-            Rectangle {
-                width: root.s(16)
-                height: root.s(16)
-                radius: root.s(8)
-                y: root.s(3)
-                x: root.freezeEnabled ? root.s(21) : root.s(3)
-                color: root.freezeEnabled
-                    ? (root.highlighted ? root.accentColor : root.baseColor)
-                    : (root.highlighted ? root.accentColor : root.surface0Color)
-                Behavior on x { NumberAnimation { duration: 250; easing.type: Easing.OutBack } }
-            }
-
-            MouseArea {
-                id: toggleMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                enabled: !root.applying
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.toggle()
-            }
+            checked: root.freezeEnabled
+            enabled: !root.applying
+            accentColor: root.highlighted ? root.baseColor : root.accentColor
+            baseColor: root.surface1Color
+            handleColor: root.highlighted ? root.accentColor : root.baseColor
+            handleOffColor: root.highlighted ? root.accentColor : root.textColor
+            textColor: root.highlighted ? root.baseColor : root.textColor
+            toggleSound: "reusables/toggle/sfx.wav"
+            onToggled: root.toggle()
         }
     }
 

@@ -2,13 +2,15 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
+import "../reusables"
 
 Rectangle {
     id: root
 
     property real uiScale: 1
     property bool highlighted: false
-    property bool vibrantEnabled: false
+    property string colorMode: "normal"
+    property string previousMode: "normal"
     property bool applying: false
     property color accentColor: "#94e2d5"
     property color baseColor: "#1e1e2e"
@@ -26,14 +28,26 @@ Rectangle {
     readonly property string dataHome: Quickshell.env("XDG_DATA_HOME") || (homeDir + "/.local/share")
     property string settingsPath: homeDir + "/.config/serpantinum/settings.json"
     readonly property string applyScript: dataHome + "/quickshell-addons/matugen-vibrant/apply.sh"
+    readonly property var modeOptions: ["OFF", "NORMAL", "VIVID"]
+    readonly property int modeIndex: {
+        let index = ["off", "normal", "vivid"].indexOf(root.colorMode);
+        return index >= 0 ? index : 1;
+    }
+
+    function setModeIndex(index) {
+        if (applying || index < 0 || index >= 3) return;
+        let modes = ["off", "normal", "vivid"];
+        let requestedMode = modes[index];
+        if (requestedMode === colorMode) return;
+        previousMode = colorMode;
+        colorMode = requestedMode;
+        applying = true;
+        applyProcess.command = [applyScript, "--mode", requestedMode];
+        applyProcess.running = true;
+    }
 
     function toggle() {
-        if (applying) return;
-        let requestedState = !vibrantEnabled;
-        vibrantEnabled = requestedState;
-        applying = true;
-        applyProcess.command = [applyScript, requestedState ? "--enable" : "--disable"];
-        applyProcess.running = true;
+        setModeIndex(modeIndex === 2 ? 1 : 2);
     }
 
     Layout.fillWidth: true
@@ -79,7 +93,7 @@ Rectangle {
             spacing: root.s(3)
 
             Text {
-                text: "Vibrant Matugen colors"
+                text: "Matugen color mode"
                 font.family: "Inter"
                 font.weight: Font.Medium
                 font.pixelSize: root.s(14)
@@ -89,7 +103,7 @@ Rectangle {
             }
 
             Text {
-                text: "Expanded palette matched to the wallpaper"
+                text: "Off preset · normal wallpaper · vivid lifted colors"
                 font.family: "Inter"
                 font.pixelSize: root.s(11)
                 color: root.highlighted ? Qt.alpha(root.baseColor, 0.75) : Qt.alpha(root.subtextColor, 0.7)
@@ -98,43 +112,27 @@ Rectangle {
             }
         }
 
-        Rectangle {
+        Dropdown {
+            id: modeSelector
             Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
-            Layout.preferredWidth: root.s(40)
-            Layout.preferredHeight: root.s(22)
-            radius: root.s(11)
-            scale: toggleMouse.containsMouse ? 1.05 : 1.0
-            opacity: root.applying ? 0.55 : 1.0
-            color: root.vibrantEnabled
-                ? (root.highlighted ? root.baseColor : root.accentColor)
-                : Qt.alpha(root.surface2Color, root.highlighted ? 0.4 : 1.0)
-
-            Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutBack } }
-            Behavior on color { ColorAnimation { duration: 220; easing.type: Easing.OutExpo } }
-            Behavior on opacity { NumberAnimation { duration: 150 } }
-
-            Rectangle {
-                width: root.s(16)
-                height: root.s(16)
-                radius: root.s(8)
-                y: root.s(3)
-                x: root.vibrantEnabled ? root.s(21) : root.s(3)
-                color: root.vibrantEnabled
-                    ? (root.highlighted ? root.accentColor : root.baseColor)
-                    : (root.highlighted ? root.accentColor : root.surface0Color)
-
-                Behavior on x { NumberAnimation { duration: 250; easing.type: Easing.OutBack } }
-                Behavior on color { ColorAnimation { duration: 220; easing.type: Easing.OutExpo } }
-            }
-
-            MouseArea {
-                id: toggleMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                enabled: !root.applying
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.toggle()
-            }
+            Layout.preferredWidth: root.s(180)
+            Layout.minimumWidth: root.s(160)
+            Layout.preferredHeight: root.s(32)
+            enabled: !root.applying
+            options: root.modeOptions
+            currentIndex: root.modeIndex
+            accentColor: root.highlighted ? root.baseColor : root.accentColor
+            baseColor: root.surface0Color
+            hoverColor: root.surface1Color
+            dropdownColor: root.surface0Color
+            borderColor: Qt.alpha(root.surface2Color, 0.6)
+            textColor: root.highlighted ? Qt.alpha(root.baseColor, 0.86) : root.textColor
+            activeTextColor: root.highlighted ? root.accentColor : root.baseColor
+            cornerRadius: root.s(11)
+            fontPixelSize: root.s(10)
+            clickSound: "reusables/dropdown/click.wav"
+            listSound: "reusables/dropdown/list.wav"
+            onValueChanged: function(index, value) { root.setModeIndex(index); }
         }
     }
 
@@ -145,9 +143,15 @@ Rectangle {
             onStreamFinished: {
                 try {
                     let settings = JSON.parse(this.text || "{}");
-                    root.vibrantEnabled = settings.vibrantMatugenColors === true;
+                    let mode = String(settings.matugenColorMode || "").toLowerCase();
+                    if (["off", "normal", "vivid"].indexOf(mode) === -1) {
+                        mode = settings.vibrantMatugenColors === true ? "vivid" : "normal";
+                    }
+                    root.colorMode = mode;
+                    root.previousMode = mode;
                 } catch (error) {
-                    root.vibrantEnabled = false;
+                    root.colorMode = "normal";
+                    root.previousMode = "normal";
                 }
             }
         }
@@ -158,7 +162,7 @@ Rectangle {
         onExited: (exitCode) => {
             root.applying = false;
             if (exitCode !== 0) {
-                root.vibrantEnabled = !root.vibrantEnabled;
+                root.colorMode = root.previousMode;
             }
             settingsReader.running = false;
             settingsReader.running = true;

@@ -845,10 +845,10 @@ Item {
     }
 
     property var allSettingsCards: [
-        { tab: 0, boxIndex: 0, label: "Vibrant Matugen colors", desc: "Expanded palette matched to the wallpaper", icon: "󰏘", color: "teal" },
+        { tab: 0, boxIndex: 0, label: "Matugen color mode", desc: "Choose preset, wallpaper, or vivid lifted colors", icon: "󰏘", color: "teal" },
         { tab: 0, boxIndex: 1, label: "Freeze screen during selection", desc: "Crop from a still image when taking screenshots", icon: "󰹑", color: "blue" },
-        { tab: 0, boxIndex: 2, label: "Music visualizer", desc: "Replace playback buttons with a CAVA spectrum", icon: "󰎆", color: "mauve" },
-        { tab: 0, boxIndex: 3, label: "Disable idle sleep and lock", desc: "Keep the session awake until this option is turned off", icon: "󰒲", color: "sapphire" }
+        { tab: 0, boxIndex: 2, label: "Disable idle sleep and lock", desc: "Keep the session awake until this option is turned off", icon: "󰒲", color: "sapphire" },
+        { tab: 0, boxIndex: 3, label: "System panel", desc: "Customize power actions and PC uptime", icon: "󰒓", color: "blue" }
     ]
 
     function getMatchingKeybindIndices(query) {

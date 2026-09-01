@@ -22,10 +22,7 @@ Item {
     signal selected(int index)
 
     function s(value) { return value * uiScale; }
-    function toggleVibrantMatugen() { vibrantCard.toggle(); }
-    function toggleScreenshotFreeze() { screenshotCard.toggle(); }
-    function toggleMusicVisualizer() { visualizerCard.toggle(); }
-    function toggleIdleInhibit() { idleInhibitCard.toggle(); }
+    function setVibrantMatugenMode(index) { vibrantCard.setModeIndex(index); }
     function scrollToBox(index) {
         const target = index * root.s(96);
         const maximum = Math.max(0, addonsColumn.implicitHeight - addonsFlickable.height + root.s(40));
@@ -75,11 +72,11 @@ Item {
                 onSelected: root.selected(1)
             }
 
-            AddonCards.MusicVisualizerCard {
-                id: visualizerCard
+            AddonCards.IdleInhibitCard {
+                id: idleInhibitCard
                 uiScale: root.uiScale
                 highlighted: root.highlightedBox === 2
-                accentColor: root.mauveColor
+                accentColor: root.sapphireColor
                 baseColor: root.baseColor
                 textColor: root.textColor
                 subtextColor: root.subtextColor
@@ -90,18 +87,17 @@ Item {
                 onSelected: root.selected(2)
             }
 
-            AddonCards.IdleInhibitCard {
-                id: idleInhibitCard
+            AddonCards.SystemPanelCard {
+                id: systemPanelCard
                 uiScale: root.uiScale
                 highlighted: root.highlightedBox === 3
-                accentColor: root.sapphireColor
+                accentColor: root.blueColor
                 baseColor: root.baseColor
                 textColor: root.textColor
                 subtextColor: root.subtextColor
                 surface0Color: root.surface0Color
                 surface1Color: root.surface1Color
                 surface2Color: root.surface2Color
-                settingsPath: root.settingsPath
                 onSelected: root.selected(3)
             }
         }

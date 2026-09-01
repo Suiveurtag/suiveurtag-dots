@@ -19,11 +19,19 @@ from pathlib import Path
 HOME = Path.home()
 XDG_CONFIG_HOME = Path(os.environ.get("XDG_CONFIG_HOME", HOME / ".config")).expanduser()
 XDG_CACHE_HOME = Path(os.environ.get("XDG_CACHE_HOME", HOME / ".cache")).expanduser()
+XDG_DATA_HOME = Path(os.environ.get("XDG_DATA_HOME", HOME / ".local/share")).expanduser()
 XDG_RUNTIME_DIR = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")).expanduser()
 HYPR_BASE = Path(os.environ.get("HYPR_CONFIG_DIR", XDG_CONFIG_HOME / "hypr")).expanduser()
 V2_SETTINGS = XDG_CONFIG_HOME / "serpantinum/settings.json"
+SERPANTINUM_HOME = Path(
+    os.environ.get("SERPANTINUM_HOME", XDG_DATA_HOME / "serpantinum")
+).expanduser()
+V2_QS_DIR = SERPANTINUM_HOME / "src/quickshell"
 QS_DIR = Path(
-    os.environ.get("HYPR_QUICKSHELL_DIR", HYPR_BASE / "scripts/quickshell")
+    os.environ.get(
+        "HYPR_QUICKSHELL_DIR",
+        V2_QS_DIR if (V2_QS_DIR / "Shell.qml").is_file() else HYPR_BASE / "scripts/quickshell",
+    )
 ).expanduser()
 SETTINGS_POPUP = Path(
     os.environ.get(
@@ -64,15 +72,17 @@ RELOAD_SCRIPT = Path(
     )
 ).expanduser()
 SHELL_QML = Path(os.environ.get("MATUGEN_SHELL_QML", QS_DIR / "Shell.qml")).expanduser()
-ADDON_DIR = Path(
-    os.environ.get("XDG_DATA_HOME", HOME / ".local/share")
-).expanduser() / "quickshell-addons/matugen-vibrant"
+STATIC_THEME_PATH = Path(
+    os.environ.get("MATUGEN_STATIC_THEME", SERPANTINUM_HOME / "src/assets/themes/Mocha.json")
+).expanduser()
+ADDON_DIR = XDG_DATA_HOME / "quickshell-addons/matugen-vibrant"
 STATE_DIR = ADDON_DIR / "state"
 BACKUP_DIR = ADDON_DIR / "backups"
 CARD_SOURCE = ADDON_DIR / "VibrantMatugenCard.qml"
 CARD_TARGET = SETTINGS_POPUP.parent / "VibrantMatugenCard.qml"
 VIBRANT_TEMPLATE = ADDON_DIR / "qs_colors.json.template"
 STOCK_TEMPLATE = STATE_DIR / "upstream-qs_colors.json.template"
+STOCK_FALLBACK = SERPANTINUM_HOME / "src/assets/matugen/templates/serpantinum_matugen_colors.json.template"
 TYPE_STATE = STATE_DIR / "quickshell-type.json"
 LOCK_FILE = XDG_RUNTIME_DIR / "quickshell-addons-settings.lock"
 
@@ -378,7 +388,7 @@ def load_type_state() -> dict:
     }
 
 
-def patch_matugen_config(text: str, enabled: bool) -> str:
+def patch_matugen_config(text: str, mode: str) -> str:
     # ThemeBackend V2 watches Serpantinium's state file, not the legacy Hypr
     # Quickshell output path.
     section_start, section_end = section_bounds(text, "templates.quickshell")
@@ -392,7 +402,7 @@ def patch_matugen_config(text: str, enabled: bool) -> str:
             absolute_end = section_start + output_match.end()
             text = text[:absolute_start] + output_line + text[absolute_end:]
     has_marker = TYPE_BEGIN in text
-    if enabled:
+    if mode == "vivid":
         if has_marker:
             return re.sub(
                 rf'({re.escape(TYPE_BEGIN)}\n)type\s*=\s*"[^"]+"',
@@ -465,7 +475,7 @@ def install_card() -> bool:
     return True
 
 
-def sync_template(enabled: bool) -> bool:
+def sync_template(mode: str) -> bool:
     if not MATUGEN_TEMPLATE.is_file():
         raise PatchError(f"Matugen Quickshell template not found: {MATUGEN_TEMPLATE}")
     if not VIBRANT_TEMPLATE.is_file():
@@ -476,12 +486,15 @@ def sync_template(enabled: bool) -> bool:
         if not STOCK_TEMPLATE.is_file() or STOCK_TEMPLATE.read_text(encoding="utf-8") != current:
             atomic_write(STOCK_TEMPLATE, current)
 
-    if enabled:
+    if mode == "vivid":
         desired = VIBRANT_TEMPLATE.read_text(encoding="utf-8")
     elif TEMPLATE_MARKER in current:
-        if not STOCK_TEMPLATE.is_file():
+        if STOCK_TEMPLATE.is_file():
+            desired = STOCK_TEMPLATE.read_text(encoding="utf-8")
+        elif STOCK_FALLBACK.is_file():
+            desired = STOCK_FALLBACK.read_text(encoding="utf-8")
+        else:
             raise PatchError("cannot restore the upstream Matugen template: no saved copy")
-        desired = STOCK_TEMPLATE.read_text(encoding="utf-8")
     else:
         desired = current
 
@@ -492,11 +505,11 @@ def sync_template(enabled: bool) -> bool:
     return True
 
 
-def sync_config(enabled: bool) -> bool:
+def sync_config(mode: str) -> bool:
     if not MATUGEN_CONFIG.is_file():
         raise PatchError(f"Matugen config not found: {MATUGEN_CONFIG}")
     current = MATUGEN_CONFIG.read_text(encoding="utf-8")
-    desired = patch_matugen_config(current, enabled)
+    desired = patch_matugen_config(current, mode)
     validate_toml(desired)
     if desired == current:
         return False
@@ -505,7 +518,36 @@ def sync_config(enabled: bool) -> bool:
     return True
 
 
-def read_enabled() -> bool:
+VALID_MODES = ("off", "normal", "vivid")
+
+
+MOCHA_COLORS = {
+    "base": "#1e1e2e",
+    "mantle": "#181825",
+    "crust": "#11111b",
+    "text": "#cdd6f4",
+    "subtext0": "#a6adc8",
+    "subtext1": "#bac2de",
+    "surface0": "#313244",
+    "surface1": "#45475a",
+    "surface2": "#585b70",
+    "overlay0": "#6c7086",
+    "overlay1": "#7f849c",
+    "overlay2": "#9399b2",
+    "blue": "#89b4fa",
+    "sapphire": "#74c7ec",
+    "peach": "#fab387",
+    "green": "#a6e3a1",
+    "red": "#f38ba8",
+    "mauve": "#cba6f7",
+    "pink": "#f5c2e7",
+    "yellow": "#f9e2af",
+    "maroon": "#eba0ac",
+    "teal": "#94e2d5",
+}
+
+
+def read_mode() -> str:
     try:
         data = json.loads(SETTINGS.read_text(encoding="utf-8"))
     except FileNotFoundError as error:
@@ -514,25 +556,80 @@ def read_enabled() -> bool:
         raise PatchError(f"invalid settings.json: {error}") from error
     if not isinstance(data, dict):
         raise PatchError("settings.json root is not an object")
-    return data.get("vibrantMatugenColors") is True
+    mode = str(data.get("matugenColorMode", "")).lower()
+    if mode in VALID_MODES:
+        return mode
+    return "vivid" if data.get("vibrantMatugenColors") is True else "normal"
 
 
-def write_enabled(enabled: bool) -> bool:
+def write_mode(mode: str) -> bool:
+    if mode not in VALID_MODES:
+        raise PatchError(f"invalid Matugen color mode: {mode}")
     try:
         data = json.loads(SETTINGS.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         raise PatchError(f"invalid settings.json: {error}") from error
     if not isinstance(data, dict):
         raise PatchError("settings.json root is not an object")
-    if data.get("vibrantMatugenColors") is enabled:
+    legacy_enabled = mode == "vivid"
+    if data.get("matugenColorMode") == mode and data.get("vibrantMatugenColors") is legacy_enabled:
         return False
-    data["vibrantMatugenColors"] = enabled
+    data["matugenColorMode"] = mode
+    data["vibrantMatugenColors"] = legacy_enabled
     backup(SETTINGS)
     atomic_write(SETTINGS, json.dumps(data, ensure_ascii=False, indent=2) + "\n")
     return True
 
 
-def regenerate_theme() -> None:
+def load_static_colors() -> dict:
+    if STATIC_THEME_PATH.is_file():
+        try:
+            payload = json.loads(STATIC_THEME_PATH.read_text(encoding="utf-8"))
+            colors = payload.get("colors", payload)
+            if isinstance(colors, dict) and colors:
+                return colors
+        except (OSError, json.JSONDecodeError):
+            pass
+    return dict(MOCHA_COLORS)
+
+
+def write_theme_for_mode(mode: str) -> bool:
+    try:
+        data = json.loads(SETTINGS.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise PatchError(f"invalid settings.json: {error}") from error
+    if not isinstance(data, dict):
+        raise PatchError("settings.json root is not an object")
+
+    old_theme = data.get("theme")
+    old_theme_preset = old_theme.get("activePreset") if isinstance(old_theme, dict) else ""
+    theme = old_theme
+    if not isinstance(theme, dict):
+        theme = {}
+    else:
+        theme = dict(theme)
+
+    if mode == "off":
+        theme["activePreset"] = "Mocha"
+        theme["matugen"] = False
+        theme["colors"] = load_static_colors()
+    else:
+        theme["activePreset"] = "Matugen"
+        theme["matugen"] = True
+        if old_theme_preset == "Mocha":
+            theme["colors"] = {}
+
+    if data.get("theme") == theme:
+        return False
+    data["theme"] = theme
+    backup(SETTINGS)
+    atomic_write(SETTINGS, json.dumps(data, ensure_ascii=False, indent=2) + "\n")
+    return True
+
+
+def regenerate_theme(mode: str) -> None:
+    if mode == "off":
+        return
     matugen = shutil.which("matugen")
     if not matugen or not WALLPAPER_CACHE.is_file():
         return
@@ -571,8 +668,9 @@ def reload_quickshell() -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Install and manage vibrant Matugen colors")
     group = parser.add_mutually_exclusive_group()
-    group.add_argument("--enable", action="store_true", help="enable vibrant Matugen colors")
-    group.add_argument("--disable", action="store_true", help="disable vibrant Matugen colors")
+    group.add_argument("--mode", choices=VALID_MODES, help="select the Matugen color mode")
+    group.add_argument("--enable", action="store_true", help="compatibility alias for vivid mode")
+    group.add_argument("--disable", action="store_true", help="compatibility alias for normal mode")
     return parser.parse_args()
 
 
@@ -586,13 +684,16 @@ def main() -> int:
     with LOCK_FILE.open("a+", encoding="utf-8") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
 
-        explicit_toggle = args.enable or args.disable
-        if explicit_toggle:
-            enabled = args.enable
-            settings_changed = write_enabled(enabled)
+        explicit_mode = args.mode is not None or args.enable or args.disable
+        if args.mode is not None:
+            mode = args.mode
+        elif args.enable:
+            mode = "vivid"
+        elif args.disable:
+            mode = "normal"
         else:
-            enabled = read_enabled()
-            settings_changed = False
+            mode = read_mode()
+        settings_changed = write_mode(mode) if explicit_mode else False
 
         card_changed = install_card()
         validate_qml(CARD_TARGET)
@@ -618,11 +719,12 @@ def main() -> int:
         else:
             validate_qml(SETTINGS_POPUP)
 
-        template_changed = sync_template(enabled)
-        config_changed = sync_config(enabled)
-        if explicit_toggle or template_changed or config_changed:
-            regenerate_theme()
-        if popup_changed or card_changed:
+        template_changed = sync_template(mode)
+        config_changed = sync_config(mode)
+        theme_changed = write_theme_for_mode(mode)
+        if mode != "off" and (explicit_mode or template_changed or config_changed):
+            regenerate_theme(mode)
+        if popup_changed or card_changed or settings_changed or theme_changed:
             reload_quickshell()
 
         changes = []
@@ -636,7 +738,9 @@ def main() -> int:
             changes.append("palette template")
         if config_changed:
             changes.append("Quickshell scheme")
-        state = "enabled" if enabled else "disabled"
+        if theme_changed:
+            changes.append("theme selection")
+        state = mode
         if changes:
             print(f"matugen-vibrant: {state}; updated " + ", ".join(changes))
         else:

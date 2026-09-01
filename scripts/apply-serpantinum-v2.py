@@ -175,6 +175,16 @@ def patch_main(text: str) -> str:
             raise ApplyError("Main.qml widget preload list not found")
         text = text[: match.start()] + match.group(1) + ', "emoji", "tor"' + match.group(2) + text[match.end() :]
 
+    if "WlrLayershell.keyboardFocus:" not in text:
+        focus_block = '''    WlrLayershell.keyboardFocus: masterWindow.isVisible
+        ? WlrKeyboardFocus.OnDemand
+        : WlrKeyboardFocus.None
+'''
+        anchor = "    WlrLayershell.layer: WlrLayer.Overlay\n"
+        if anchor not in text:
+            raise ApplyError("Main.qml master layer anchor not found")
+        text = text.replace(anchor, anchor + focus_block, 1)
+
     marker = "BEGIN user-addon: calendar-legacy-v1-intro-hook"
     if marker in text:
         return text
@@ -183,12 +193,14 @@ def patch_main(text: str) -> str:
         raise ApplyError("Main.qml calendar intro hook anchor not found")
     hook = (
         "        // BEGIN user-addon: calendar-legacy-v1-intro-hook\n"
-        "        if (newWidget === \"calendar\" && cachedItem.resetAndPlayIntro !== undefined) {\n"
-        "            cachedItem.resetAndPlayIntro();\n"
-        "        }\n"
+        "        Qt.callLater(function() {\n"
+        "            if (newWidget === \"calendar\" && cachedItem.resetAndPlayIntro !== undefined) {\n"
+        "                cachedItem.resetAndPlayIntro();\n"
+        "            }\n"
+        "        });\n"
         "        // END user-addon: calendar-legacy-v1-intro-hook\n"
     )
-    return text.replace(anchor, hook + anchor, 1)
+    return text.replace(anchor, anchor + hook, 1)
 
 
 def patch_floating(text: str) -> str:
@@ -287,17 +299,100 @@ import "." as WallpaperRandom
     button_pattern = re.compile(
         r"            // BEGIN user-addon: serpantinum-v2 random wallpaper button\n"
         r".*?"
-        r"            // END user-addon: serpantinum-v2 random wallpaper button\n",
+        r"            // END user-addon: serpantinum-v2 random wallpaper button\n"
+        r"(?:[ \t]*\n)?",
         re.DOTALL,
     )
     if button_pattern.search(text):
-        return button_pattern.sub(button_block, text, count=1)
-    return add_before(
-        text,
-        "            Item {\n                id: searchControlContainer",
-        button_block,
-        "BEGIN user-addon: serpantinum-v2 random wallpaper button",
+        text = button_pattern.sub(button_block, text, count=1)
+    else:
+        text = add_before(
+            text,
+            "            Item {\n                id: searchControlContainer",
+            button_block,
+            "BEGIN user-addon: serpantinum-v2 random wallpaper button",
+        )
+
+    navigation_block = '''    function stepToNextValidIndex(direction, shouldApply) {
+        if (displayModel.count === 0) return;
+        window.initialFocusSet = true;
+
+        let currentIdx = (view.currentIndex >= 0 && view.currentIndex < displayModel.count)
+            ? view.currentIndex
+            : (direction > 0 ? -1 : displayModel.count);
+        let nextIdx = (currentIdx + direction + displayModel.count) % displayModel.count;
+        if (nextIdx >= 0 && nextIdx < displayModel.count) {
+            view.currentIndex = nextIdx;
+        }
+    }
+
+'''
+    if "function stepToNextValidIndex(direction, shouldApply)" not in text:
+        navigation_pattern = re.compile(
+            r"    function stepToNextValidIndex\(direction\) \{\n.*?^    \}\n",
+            re.DOTALL | re.MULTILINE,
+        )
+        text, replaced = navigation_pattern.subn(navigation_block, text, count=1)
+        if replaced != 1:
+            raise ApplyError("WallpaperPicker arrow navigation anchor not found")
+
+    key_handler_block = '''        // BEGIN user-addon: serpantinum-v2 wallpaper arrow keys
+        Keys.priority: Keys.BeforeItem
+        Keys.onShortcutOverride: function(event) {
+            if (event.key === Qt.Key_Left || event.key === Qt.Key_Right) {
+                event.accepted = true;
+            }
+        }
+        Keys.onPressed: function(event) {
+            if (event.key === Qt.Key_Left || event.key === Qt.Key_Right) {
+                event.accepted = true;
+                window.stepToNextValidIndex(event.key === Qt.Key_Left ? -1 : 1, false);
+            }
+        }
+        // END user-addon: serpantinum-v2 wallpaper arrow keys
+
+'''
+    if "BEGIN user-addon: serpantinum-v2 wallpaper arrow keys" not in text:
+        text = add_before(text, "        onCurrentIndexChanged: {", key_handler_block, "wallpaper arrow keys")
+
+    cycle_block = '''    function cycleFilter(direction) {
+        let allFilterNames = ["All", "History", "Video", "Red", "Orange", "Yellow", "Green", "Blue", "Purple", "Pink", "Monochrome", "Search"];
+        let currentIdx = allFilterNames.indexOf(window.currentFilter);
+        if (currentIdx !== -1) {
+            let nextIdx = (currentIdx + direction + allFilterNames.length) % allFilterNames.length;
+            window.setFilter(allFilterNames[nextIdx]);
+        }
+    }
+'''
+    if "Keep the keyboard cycle deterministic" not in text:
+        cycle_pattern = re.compile(
+            r"    function cycleFilter\(direction\) \{\n.*?^    \}\n",
+            re.DOTALL | re.MULTILINE,
+        )
+        text, replaced = cycle_pattern.subn(cycle_block, text, count=1)
+        if replaced != 1:
+            raise ApplyError("WallpaperPicker cycleFilter anchor not found")
+
+    text = text.replace(
+        'Shortcut { sequence: "Left"; enabled: window.visible && !searchInput.hasFocus && !window.isScrollingBlocked && !window.isApplying; onActivated: window.stepToNextValidIndex(-1) }',
+        '',
+        1,
     )
+    text = text.replace(
+        'Shortcut { sequence: "Right"; enabled: window.visible && !searchInput.hasFocus && !window.isScrollingBlocked && !window.isApplying; onActivated: window.stepToNextValidIndex(1) }',
+        '',
+        1,
+    )
+    if 'Shortcut { sequence: "Up"; context: Qt.ApplicationShortcut' not in text:
+        tab_anchor = '    Shortcut { sequence: "Tab"; enabled: window.visible && !window.isApplying; onActivated: window.cycleFilter(1) }'
+        text = text.replace(
+            tab_anchor,
+            '    Shortcut { sequence: "Up"; context: Qt.ApplicationShortcut; enabled: window.visible; onActivated: window.stepToNextValidIndex(-1, false) }\n'
+            '    Shortcut { sequence: "Down"; context: Qt.ApplicationShortcut; enabled: window.visible; onActivated: window.stepToNextValidIndex(1, false) }\n'
+            + tab_anchor,
+            1,
+        )
+    return text
 
 
 def patch_guide(text: str) -> str:
@@ -407,6 +502,28 @@ hl.bind(mainMod .. " + SHIFT + H", hl.dsp.exec_cmd("serpantinum ipc call legacys
             'hl.bind(mainMod .. " + H", hl.dsp.exec_cmd("serpantinum msg toggle guide"))',
             'hl.bind(mainMod .. " + P", hl.dsp.exec_cmd("serpantinum msg toggle guide"))',
         )
+        guide_binding = 'hl.bind("SUPER + P", hl.dsp.exec_cmd("serpantinum msg toggle guide"))\n'
+        guide_pattern = re.compile(
+            r'^hl\.bind\((?:"SUPER \+ P"|mainMod \.\. " \+ P"), hl\.dsp\.exec_cmd\("serpantinum msg toggle guide"\)\)\n',
+            re.MULTILINE,
+        )
+        guide_lines = []
+        guide_seen = False
+        for line in text.splitlines(keepends=True):
+            if guide_pattern.match(line):
+                if guide_seen:
+                    continue
+                guide_lines.append(guide_binding)
+                guide_seen = True
+            else:
+                guide_lines.append(line)
+        text = "".join(guide_lines)
+        if not guide_seen:
+            text = text.replace(
+                "-- END user-addon: serpantinum-v2 keybinds\n",
+                guide_binding + "-- END user-addon: serpantinum-v2 keybinds\n",
+                1,
+            )
         return text
     anchor = 'local terminal = _G.terminal or "kitty"\n'
     if anchor not in text:
@@ -423,6 +540,204 @@ def patch_bar(text: str) -> str:
     text = text.replace(
         'if (!barWindow.isNotifOpen && !barWindow.isSysOpen && barWindow.pendingReload)',
         'if (!barWindow.isNotifOpen && !barWindow.isLeftOpen && !barWindow.isSysOpen && barWindow.pendingReload)',
+        1,
+    )
+    return text
+
+
+def patch_system_panel(text: str) -> str:
+    action_properties = '''    // BEGIN user-addon: system panel preferences
+    readonly property bool replaceHibernateWithLogout: {
+        let all = typeof Config !== "undefined" ? Config.rawSettings : {};
+        let settings = all && all.syspanel ? all.syspanel : {};
+        return settings.replaceHibernateWithLogout !== false;
+    }
+
+    readonly property bool showUptime: {
+        let all = typeof Config !== "undefined" ? Config.rawSettings : {};
+        let settings = all && all.syspanel ? all.syspanel : {};
+        return settings.showUptime !== false;
+    }
+
+    readonly property var powerActionModel: replaceHibernateWithLogout ? [
+        { cmd: "lock", icon: "", weight: 1.0 },
+        { cmd: "sleep", icon: "ᶻ 𝗓 𝗓", weight: 1.0 },
+        { cmd: "logout", icon: "󰍃", weight: 1.5 },
+        { cmd: "reboot", icon: "󰑓", weight: 2.5 },
+        { cmd: "poweroff", icon: "", weight: 3.5 }
+    ] : [
+        { cmd: "lock", icon: "", weight: 1.0 },
+        { cmd: "sleep", icon: "ᶻ 𝗓 𝗓", weight: 1.0 },
+        { cmd: "hibernate", icon: "󰤄", weight: 1.5 },
+        { cmd: "reboot", icon: "󰑓", weight: 2.5 },
+        { cmd: "poweroff", icon: "", weight: 3.5 }
+    ]
+    // END user-addon: system panel preferences
+
+'''
+    text = add_before(
+        text,
+        '    readonly property color batColorFlat: {',
+        action_properties,
+        "BEGIN user-addon: system panel preferences",
+    )
+
+    uptime_block = '''                // BEGIN user-addon: system panel uptime
+                Rectangle {
+                    id: uptimeBox
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: root.s(38)
+                    Layout.maximumHeight: root.s(38)
+                    visible: root.showUptime
+                    radius: root.cardRadius
+                    color: Qt.darker(ThemeBackend.surface0, 1.04)
+
+                    opacity: root.introTop
+                    transform: [
+                        Translate { y: root.s(-14) * (1.0 - root.introTop) },
+                        Scale { origin.x: uptimeBox.width / 2; origin.y: uptimeBox.height / 2; xScale: 0.96 + (0.04 * root.introTop); yScale: 0.96 + (0.04 * root.introTop) }
+                    ]
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: root.s(12)
+                        anchors.rightMargin: root.s(12)
+                        spacing: root.s(9)
+
+                        Text {
+                            text: "󰔚"
+                            font.family: "Iosevka Nerd Font"
+                            font.pixelSize: root.s(17)
+                            color: ThemeBackend.blue
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 0
+
+                            Text {
+                                text: "UPTIME"
+                                font.family: "JetBrains Mono"
+                                font.weight: Font.Bold
+                                font.pixelSize: root.s(8)
+                                color: ThemeBackend.subtext0
+                            }
+
+                            Text {
+                                text: SystemInfo.uptime !== "" ? SystemInfo.uptime : "—"
+                                font.family: ThemeBackend.fontFamily
+                                font.weight: Font.Black
+                                font.pixelSize: root.s(13)
+                                color: ThemeBackend.text
+                            }
+                        }
+                    }
+                }
+                // END user-addon: system panel uptime
+
+'''
+    text = add_before(
+        text,
+        '                Rectangle {\n                    id: userBox',
+        uptime_block,
+        "BEGIN user-addon: system panel uptime",
+    )
+
+    inline_uptime_block = '''                        // BEGIN user-addon: system panel uptime
+                        ColumnLayout {
+                            id: uptimeBox
+                            Layout.alignment: Qt.AlignTop | Qt.AlignRight
+                            Layout.preferredWidth: root.s(92)
+                            Layout.preferredHeight: root.s(34)
+                            visible: root.showUptime
+                            spacing: 0
+
+                            Text {
+                                Layout.alignment: Qt.AlignRight
+                                text: "UPTIME"
+                                font.family: "JetBrains Mono"
+                                font.weight: Font.Bold
+                                font.pixelSize: root.s(8)
+                                color: ThemeBackend.subtext0
+                            }
+
+                            Text {
+                                Layout.alignment: Qt.AlignRight
+                                text: SystemInfo.uptime !== "" ? SystemInfo.uptime : "—"
+                                font.family: ThemeBackend.fontFamily
+                                font.weight: Font.Black
+                                font.pixelSize: root.s(13)
+                                color: ThemeBackend.text
+                            }
+                        }
+                        // END user-addon: system panel uptime
+
+'''
+    text = re.sub(
+        r'(?ms)^                // BEGIN user-addon: system panel uptime\n.*?^                // END user-addon: system panel uptime\n\n?',
+        '',
+        text,
+        count=1,
+    )
+    if "BEGIN user-addon: system panel uptime" not in text:
+        logout_anchor = re.search(
+            r'(?m)^                        (?:ClickButton|Item) \{\n                            id: logoutBtn',
+            text,
+        )
+        if not logout_anchor:
+            raise ApplyError("SystemPanel logout button anchor not found")
+        text = text[:logout_anchor.start()] + inline_uptime_block + text[logout_anchor.start():]
+
+    text = re.sub(
+        r'(?ms)^                        model: ListModel \{\n                            ListElement \{ cmd: "lock".*?^                        \}',
+        '                        model: root.powerActionModel',
+        text,
+        count=1,
+    )
+    if '                            property string cmd: modelData.cmd || ""' not in text:
+        text = text.replace(
+            '                            property bool isHibernate: cmd === "hibernate"',
+            '                            property string cmd: modelData.cmd || ""\n                            property string icon: modelData.icon || ""\n                            property real weight: Number(modelData.weight || 1)\n                            property bool isHibernate: cmd === "hibernate"',
+            1,
+        )
+    text = text.replace(
+        'let scriptPath = cmd === "lock" ? Caching.serpantinumDir + "/scripts/lock.sh" : Caching.serpantinumDir + "/scripts/system/" + (cmd === "sleep" ? "suspend.sh" : cmd + ".sh");',
+        'let scriptPath = cmd === "lock" ? Caching.serpantinumDir + "/scripts/lock.sh" : Caching.serpantinumDir + "/scripts/system/" + (cmd === "sleep" ? "suspend.sh" : (cmd === "logout" ? "exit.sh" : cmd + ".sh"));',
+        1,
+    )
+    text = text.replace(
+        '                                gradColor1: root.sysMuted ? ThemeBackend.surface2 : root.volColor\n                                gradColor2: root.sysMuted ? ThemeBackend.surface2 : Qt.lighter(root.volColor, 1.05)\n                                gradColor3: root.sysMuted ? ThemeBackend.surface2 : Qt.lighter(root.volColor, 1.10)',
+        '                                gradColor1: root.sysMuted ? ThemeBackend.surface2 : Qt.lighter(ThemeBackend.blue, 1.15)\n                                gradColor2: root.sysMuted ? ThemeBackend.surface2 : Qt.lighter(ThemeBackend.mauve, 1.10)\n                                gradColor3: root.sysMuted ? ThemeBackend.surface2 : Qt.lighter(ThemeBackend.pink, 1.05)',
+        1,
+    )
+    text = text.replace(
+        '                            accentColor: root.profileColor\n                            baseColor: ThemeBackend.surface1',
+        '                            accentColor: root.profileColor\n                            gradColor1: root.profileColor\n                            gradColor2: Qt.lighter(root.profileColor, 1.10)\n                            gradColor3: Qt.lighter(root.profileColor, 1.20)\n                            baseColor: ThemeBackend.surface1',
+        1,
+    )
+    text = text.replace(
+        '                            gradColor1: Qt.lighter(ThemeBackend.blue, 1.15)\n                            gradColor2: Qt.lighter(ThemeBackend.mauve, 1.10)\n                            gradColor3: Qt.lighter(ThemeBackend.pink, 1.05)',
+        '                            gradColor1: root.profileColor\n                            gradColor2: Qt.lighter(root.profileColor, 1.10)\n                            gradColor3: Qt.lighter(root.profileColor, 1.20)',
+        1,
+    )
+    text = text.replace(
+        '    readonly property color profileColor: Qt.lighter(ThemeBackend.blue, 1.55)',
+        '    readonly property color profileColor: {\n'
+        '        // Use the live Matugen palette, as in Ilyamiro\'s original panel.\n'
+        '        switch (powerProfile) {\n'
+        '            case "performance": return ThemeBackend.red;\n'
+        '            case "power-saver": return ThemeBackend.green;\n'
+        '            default: return ThemeBackend.blue;\n'
+        '        }\n'
+        '    }\n'
+        '    readonly property color profileGrad1: powerProfile === "performance" ? ThemeBackend.red : (powerProfile === "power-saver" ? ThemeBackend.green : ThemeBackend.blue)\n'
+        '    readonly property color profileGrad2: powerProfile === "performance" ? ThemeBackend.peach : (powerProfile === "power-saver" ? ThemeBackend.teal : ThemeBackend.sapphire)\n'
+        '    readonly property color profileGrad3: powerProfile === "performance" ? ThemeBackend.pink : (powerProfile === "power-saver" ? ThemeBackend.yellow : ThemeBackend.mauve)',
+        1,
+    )
+    text = text.replace(
+        '                            gradColor1: root.profileColor\n                            gradColor2: Qt.lighter(root.profileColor, 1.10)\n                            gradColor3: Qt.lighter(root.profileColor, 1.20)',
+        '                            gradColor1: root.profileGrad1\n                            gradColor2: root.profileGrad2\n                            gradColor3: root.profileGrad3',
         1,
     )
     return text
@@ -466,6 +781,7 @@ def main() -> int:
         ADDONS_ROOT / "serpantinum-settings/SettingsPopup.qml": QS_DIR / "settings/SettingsPopup.qml",
         ADDONS_ROOT / "serpantinum-settings/SettingsWindow.qml": QS_DIR / "settings/SettingsWindow.qml",
         ADDONS_ROOT / "serpantinum-settings/Config.qml": QS_DIR / "singletons/Config.qml",
+        ADDONS_ROOT / "serpantinum-settings/SystemPanelCard.qml": QS_DIR / "settings/SystemPanelCard.qml",
         ADDONS_ROOT / "serpantinum-settings/keybinds_v2.py": ADDONS_ROOT / "serpantinum-settings/keybinds_v2.py",
         ADDONS_ROOT / "music-preview-rounded/AddonSettingsPage.qml": QS_DIR / "settings/AddonSettingsPage.qml",
         ADDONS_ROOT / "matugen-vibrant/VibrantMatugenCard.qml": QS_DIR / "settings/VibrantMatugenCard.qml",
@@ -493,6 +809,7 @@ def main() -> int:
         (QS_DIR / "wallpaper/WallpaperPicker.qml", patch_wallpaper),
         (QS_DIR / "Shell.qml", patch_shell),
         (QS_DIR / "bar/Bar.qml", patch_bar),
+        (QS_DIR / "syspanel/SystemPanel.qml", patch_system_panel),
         (HYPR_DIR / "config/keybinds.lua", patch_keybinds),
     )
     for path, transform in targets:
