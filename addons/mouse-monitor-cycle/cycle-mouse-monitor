@@ -1,0 +1,36 @@
+#!/bin/sh
+set -eu
+
+cursor=$(hyprctl cursorpos -j)
+cx=$(printf '%s\n' "$cursor" | jq -r '.x // empty')
+cy=$(printf '%s\n' "$cursor" | jq -r '.y // empty')
+
+target=$(hyprctl monitors -j | jq -r --argjson cx "$cx" --argjson cy "$cy" '
+  sort_by(.x, .y) as $monitors
+  | if ($monitors | length) == 0 then
+      empty
+    else
+      (first($monitors[] | select(
+        $cx >= .x and $cx < (.x + (.width / .scale)) and
+        $cy >= .y and $cy < (.y + (.height / .scale))
+      )) // $monitors[0]) as $current
+      | (($monitors | index($current) + 1) % ($monitors | length)) as $next
+      | $monitors[$next]
+      | [(.x + ((.width / .scale) / 2)), (.y + ((.height / .scale) / 2))]
+      | @tsv
+    end
+')
+
+if [ -z "$target" ]; then
+    exit 0
+fi
+
+read -r target_x target_y <<EOF
+$target
+EOF
+
+if [ -z "${target_x:-}" ] || [ -z "${target_y:-}" ]; then
+    exit 0
+fi
+
+hyprctl dispatch "hl.dsp.cursor.move({ x = $target_x, y = $target_y })"

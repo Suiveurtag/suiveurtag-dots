@@ -478,9 +478,26 @@ hl.bind(mainMod .. " + J", hl.dsp.exec_cmd("serpantinum msg toggle emoji"))
 hl.bind(mainMod .. " + K", hl.dsp.exec_cmd("serpantinum msg toggle tor"))
 hl.bind(mainMod .. " + ALT + Z", hl.dsp.exec_cmd("~/.local/share/quickshell-addons/zoomit/zoomit.py zoom-toggle"))
 hl.bind(mainMod .. " + ALT + D", hl.dsp.exec_cmd("~/.local/share/quickshell-addons/zoomit/zoomit.py draw-toggle"))
-hl.bind(mainMod .. " + SHIFT + H", hl.dsp.exec_cmd("serpantinum ipc call legacysettings toggle"))
+hl.bind(mainMod .. " + SHIFT + P", hl.dsp.exec_cmd("serpantinum msg toggle legacysettings"))
+hl.bind("SUPER + TAB", hl.dsp.exec_cmd("~/.local/bin/cycle-mouse-monitor"))
+hl.bind("SUPER + SPACE", hl.dsp.exec_cmd("hyprctl switchxkblayout all next"), { locked = true })
+hl.bind("SUPER + P", hl.dsp.exec_cmd("serpantinum msg toggle guide"))
 -- END user-addon: serpantinum-v2 keybinds
 '''
+    required_bindings = (
+        'hl.bind("SUPER + TAB", hl.dsp.exec_cmd("~/.local/bin/cycle-mouse-monitor"))',
+        'hl.bind("SUPER + SPACE", hl.dsp.exec_cmd("hyprctl switchxkblayout all next"), { locked = true })',
+    )
+
+    def ensure_binding(line: str) -> None:
+        nonlocal text
+        if line in text:
+            return
+        marker_end = "-- END user-addon: serpantinum-v2 keybinds\n"
+        if marker_end not in text:
+            raise ApplyError("Serpantinum keybind marker end not found")
+        text = text.replace(marker_end, line + "\n" + marker_end, 1)
+
     if "BEGIN user-addon: serpantinum-v2 keybinds" in text:
         text = text.replace(
             'hl.bind(mainMod .. " + SHIFT + H", hl.dsp.exec_cmd("serpantinum ipc call legacysettings toggle"))',
@@ -524,6 +541,8 @@ hl.bind(mainMod .. " + SHIFT + H", hl.dsp.exec_cmd("serpantinum ipc call legacys
                 guide_binding + "-- END user-addon: serpantinum-v2 keybinds\n",
                 1,
             )
+        for binding in required_bindings:
+            ensure_binding(binding)
         return text
     anchor = 'local terminal = _G.terminal or "kitty"\n'
     if anchor not in text:
@@ -773,6 +792,7 @@ def main() -> int:
 
     changed: list[str] = []
     copies = {
+        ADDONS_ROOT / "mouse-monitor-cycle/cycle-mouse-monitor": Path.home() / ".local/bin/cycle-mouse-monitor",
         ADDONS_ROOT / "emoji-picker/EmojiPicker.qml": QS_DIR / "emoji/EmojiPicker.qml",
         ADDONS_ROOT / "emoji-picker/emojis.json": QS_DIR / "emoji/emojis.json",
         ADDONS_ROOT / "tor-panel/TorPanel.qml": QS_DIR / "tor/TorPanel.qml",

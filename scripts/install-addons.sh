@@ -86,6 +86,12 @@ install_addon() {
     fi
 }
 
+install_monitor_cycle() {
+    local bin_dir="${XDG_BIN_HOME:-$HOME/.local/bin}"
+    mkdir -p "$bin_dir"
+    install -m 0755 "$ADDONS_SRC/mouse-monitor-cycle/cycle-mouse-monitor" "$bin_dir/cycle-mouse-monitor"
+}
+
 install_systemd_units() {
     mkdir -p "$SYSTEMD_DST"
 
@@ -164,6 +170,7 @@ install_serpantinum_v2_addons() {
     local addon
     for addon in \
         emoji-picker \
+        mouse-monitor-cycle \
         zoomit \
         launcher-web-search \
         drawing-notes \
@@ -183,6 +190,7 @@ install_serpantinum_v2_addons() {
         tor-panel; do
         install_addon "$addon"
     done
+    install_monitor_cycle
 
     cp "$REPO_DIR/scripts/apply-serpantinum-v2.py" "$ADDONS_DST/apply-serpantinum-v2.py"
     chmod +x "$ADDONS_DST/apply-serpantinum-v2.py"
@@ -224,6 +232,8 @@ fi
 
 install_addon "wallpaper-random"
 install_addon "emoji-picker"
+install_addon "mouse-monitor-cycle"
+install_monitor_cycle
 install_addon "matugen-vibrant"
 install_addon "zoomit"
 install_addon "screenshot-freeze"
@@ -424,10 +434,6 @@ else
             warn "wifi-hold-sound patch failed"
             patch_failures=$((patch_failures + 1))
         fi
-        if ! run_apply WIFI_HOLD_SOUND_APPLY_DELAY=0 "$ADDONS_DST/wifi-hold-sound/apply.sh"; then
-            warn "wifi-hold-sound patch failed"
-            patch_failures=$((patch_failures + 1))
-        fi
     else
         warn "Quickshell network panel not found (expected $NETWORK_POPUP_QML)"
         echo "  install the Hyprland/Quickshell dots first; the watchers will apply these addons later" >&2
@@ -485,4 +491,4 @@ if (( patch_failures > 0 )); then
     exit 1
 fi
 
-echo "Installed wallpaper-random, emoji-picker, matugen-vibrant, zoomit, screenshot-freeze, idle-inhibit, music-preview-rounded, topbar-button-effects, launcher-web-search, custom-alarm-clock, drawing-notes, headset-mic-loopback, captive-portal, speedtest, loading-icon, wifi-text-scroll, dns-mode-toggle and tor-panel addons."
+echo "Installed wallpaper-random, emoji-picker, mouse-monitor-cycle, matugen-vibrant, zoomit, screenshot-freeze, idle-inhibit, music-preview-rounded, topbar-button-effects, launcher-web-search, custom-alarm-clock, drawing-notes, headset-mic-loopback, captive-portal, speedtest, loading-icon, wifi-text-scroll, dns-mode-toggle, wifi-hold-sound and tor-panel addons."
