@@ -56,7 +56,7 @@ install_monitor_cycle() {
 }
 
 install_serpantinum_v2_addons() {
-    info "Serpantinum V2 détecté dans $SERPANTINUM_HOME_DIR"
+    info "Serpantinum V2 found at $SERPANTINUM_HOME_DIR"
 
     local addon
     for addon in \
@@ -121,11 +121,6 @@ install_serpantinum_v2_addons() {
 
 required=(
     "$SERPANTINUM_QS_DIR/Shell.qml"
-    "$SERPANTINUM_QS_DIR/Main.qml"
-    "$SERPANTINUM_QS_DIR/WindowRegistry.js"
-    "$SERPANTINUM_QS_DIR/wallpaper/WallpaperPicker.qml"
-    "$SERPANTINUM_QS_DIR/syspanel/SystemPanel.qml"
-    "$SERPANTINUM_QS_DIR/settings/SettingsPopup.qml"
 )
 missing=()
 for path in "${required[@]}"; do
@@ -133,9 +128,9 @@ for path in "${required[@]}"; do
 done
 
 if ((${#missing[@]} > 0)); then
-    echo "error: Serpantinum V2 est introuvable ou incomplet." >&2
-    echo "  fichiers manquants : ${missing[*]}" >&2
-    echo "  installe d'abord la dernière release Serpantinum V2, puis relance cet installateur." >&2
+    echo "error: Serpantinum's base shell was not found." >&2
+    echo "  missing path: ${missing[*]}" >&2
+    echo "  install Serpantinum separately, then rerun this installer." >&2
     exit 1
 fi
 

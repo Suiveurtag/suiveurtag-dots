@@ -50,7 +50,7 @@ These addons are designed to stay isolated from the upstream dots:
 
 - `addons/`: addon source files copied into `~/.local/share/quickshell-addons`
 - `systemd/user/`: watcher units copied into `~/.config/systemd/user`
-- `install.sh`: verifies the already-installed Serpantinum V2 release, then installs or refreshes every addon on top of it
+- `install.sh`: checks for the existing Serpantinum V2 base shell, then installs or refreshes every addon on top of it
 - `scripts/install-addons.sh`: internal idempotent addon deployment used by `install.sh`
 
 ## Install
@@ -65,7 +65,7 @@ What it does:
 
 - downloads this repository into a temporary directory when launched from the command above
 - checks the distribution, user session, and required commands
-- requires the latest Serpantinum V2 release to already be installed; it never reinstalls or updates the upstream shell
+- requires the Serpantinum V2 base shell to already be present; it never reinstalls or updates the upstream shell
 - copies all addons into `~/.local/share/quickshell-addons`
 - copies the user systemd units into `~/.config/systemd/user`
 - enables and starts the watcher path units
@@ -84,7 +84,7 @@ Useful options:
 
 - `--no-color`: disable colored output
 
-If Serpantinum V2 is missing or incomplete, the installer stops and reports the missing V2 paths instead of trying to install another shell.
+If the Serpantinum V2 base shell is missing, the installer stops and reports its expected entrypoint instead of trying to install another shell or validate a release version.
 
 ## Notes
 
