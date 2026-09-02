@@ -1,6 +1,6 @@
-# Hyprland Personal Addons
+# Serpantinum V2 Personal Addons
 
-Personal addons layered on top of ilyamiro's Hyprland + Quickshell dots.
+Personal addons layered on top of the installed Serpantinum V2 Hyprland + Quickshell shell.
 
 This repo currently contains:
 
@@ -50,7 +50,7 @@ These addons are designed to stay isolated from the upstream dots:
 
 - `addons/`: addon source files copied into `~/.local/share/quickshell-addons`
 - `systemd/user/`: watcher units copied into `~/.config/systemd/user`
-- `install.sh`: bootstraps ilyamiro's dots, then installs or refreshes every addon
+- `install.sh`: verifies the already-installed Serpantinum V2 release, then installs or refreshes every addon on top of it
 - `scripts/install-addons.sh`: internal idempotent addon deployment used by `install.sh`
 
 ## Install
@@ -64,9 +64,8 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/Suiveurtag/suiveurtag-do
 What it does:
 
 - downloads this repository into a temporary directory when launched from the command above
-- checks the distribution, user session, and required bootstrap commands
-- downloads and runs [ilyamiro's official imperative-dots installer](https://github.com/ilyamiro/imperative-dots) when the base dots are missing
-- skips the upstream installer when a working installation is already present
+- checks the distribution, user session, and required commands
+- requires the latest Serpantinum V2 release to already be installed; it never reinstalls or updates the upstream shell
 - copies all addons into `~/.local/share/quickshell-addons`
 - copies the user systemd units into `~/.config/systemd/user`
 - enables and starts the watcher path units
@@ -83,11 +82,9 @@ The installer is safe to run again to refresh the addons. To run it from a clone
 
 Useful options:
 
-- `--force-dots`: rerun ilyamiro's installer even when the base dots are detected
-- `--skip-dots`: apply only the Suiveurtag addons
 - `--no-color`: disable colored output
 
-The upstream ilyamiro installer is interactive, may request `sudo`, supports Arch Linux and its derivatives, and announces anonymous telemetry in its own README.
+If Serpantinum V2 is missing or incomplete, the installer stops and reports the missing V2 paths instead of trying to install another shell.
 
 ## Notes
 
@@ -113,7 +110,7 @@ The upstream ilyamiro installer is interactive, may request `sudo`, supports Arc
   - `Super+Alt+Z`: smoothly toggle a 2× cursor-following zoom. While active, use the wheel to zoom further in or return to 1×.
   - `Super+Alt+D`: toggle drawing on a frozen image of the screen under the cursor.
 - Drawing controls follow ZoomIt conventions: drag to draw, `Shift`+drag for a line, `Ctrl`+drag for a rectangle, `Ctrl+Shift`+drag for an arrow, and hold `Tab` (or `Alt`) while dragging for an ellipse. `R/G/B/Y/O/P` select colors, `Ctrl+wheel` changes pen width, `Ctrl+Z` undoes, `E` clears, `W`/`K` select a white/black board, and right-click or `Esc` exits.
-- The zoom uses Hyprland's native compositor magnifier, with anti-aliasing enabled and a 120 fps eased transition. The drawing overlay requires the commands `grim`, `qs`, and `qmllint` (already present in ilyamiro's dots setup).
+- The zoom uses Hyprland's native compositor magnifier, with anti-aliasing enabled and a 120 fps eased transition. The drawing overlay requires the commands `grim`, `qs`, and `qmllint` (already present in Serpantinum V2).
 - Installation refreshes the running Quickshell instance so newly added ZoomIt shortcuts appear in **Settings → Keybinds** immediately.
 - Custom ZoomIt key combinations selected in **Settings → Keybinds** are preserved by the addon watcher; defaults are only recreated when an addon entry is missing.
 - The captive portal addon uses `nmcli` for connectivity state and `curl` to discover the login redirect URL when a hotspot requires web authentication.
