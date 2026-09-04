@@ -327,7 +327,7 @@ import "." as WallpaperRandom
 
 '''
     navigation_pattern = re.compile(
-        r"    function stepToNextValidIndex\(direction(?:, shouldApply)?\) \{\n.*?^    \}\n",
+        r"    function stepToNextValidIndex\(direction(?:, shouldApply)?\) \{\n.*?^    \}\n(?:\n)*",
         re.DOTALL | re.MULTILINE,
     )
     text, replaced = navigation_pattern.subn(navigation_block, text, count=1)
@@ -337,38 +337,27 @@ import "." as WallpaperRandom
     text = re.sub(
         r"\n[ \t]*// BEGIN user-addon: serpantinum-v2 wallpaper arrow keys\n"
         r".*?"
-        r"[ \t]*// END user-addon: serpantinum-v2 wallpaper arrow keys\n",
+        r"[ \t]*// END user-addon: serpantinum-v2 wallpaper arrow keys\n(?:\n)*",
         "\n",
         text,
         count=1,
         flags=re.DOTALL,
     )
-    key_handler_block = '''        // BEGIN user-addon: serpantinum-v2 wallpaper arrow keys
-        Keys.priority: Keys.BeforeItem
-        Keys.onLeftPressed: function(event) {
-            if (window.isScrollingBlocked || window.isApplying || searchInput.hasFocus) return;
-            window.stepToNextValidIndex(-1, false);
-            event.accepted = true;
-        }
-        Keys.onRightPressed: function(event) {
-            if (window.isScrollingBlocked || window.isApplying || searchInput.hasFocus) return;
-            window.stepToNextValidIndex(1, false);
-            event.accepted = true;
-        }
-        Keys.onUpPressed: function(event) {
-            if (window.isScrollingBlocked || window.isApplying || searchInput.hasFocus) return;
-            window.stepToNextValidIndex(-1, false);
-            event.accepted = true;
-        }
-        Keys.onDownPressed: function(event) {
-            if (window.isScrollingBlocked || window.isApplying || searchInput.hasFocus) return;
-            window.stepToNextValidIndex(1, false);
-            event.accepted = true;
-        }
-        // END user-addon: serpantinum-v2 wallpaper arrow keys
+    text = re.sub(
+        r'^\s*Shortcut \{ sequence: "(?:Left|Right|Up|Down)";.*\}\n',
+        '',
+        text,
+        flags=re.MULTILINE,
+    )
+    shortcut_block = '''    // BEGIN user-addon: serpantinum-v2 wallpaper arrow keys
+    Shortcut { sequence: "Left"; context: Qt.ApplicationShortcut; enabled: window.visible && !searchInput.hasFocus && !window.isScrollingBlocked && !window.isApplying; onActivated: window.stepToNextValidIndex(-1, false) }
+    Shortcut { sequence: "Right"; context: Qt.ApplicationShortcut; enabled: window.visible && !searchInput.hasFocus && !window.isScrollingBlocked && !window.isApplying; onActivated: window.stepToNextValidIndex(1, false) }
+    Shortcut { sequence: "Up"; context: Qt.ApplicationShortcut; enabled: window.visible && !searchInput.hasFocus && !window.isScrollingBlocked && !window.isApplying; onActivated: window.stepToNextValidIndex(-1, false) }
+    Shortcut { sequence: "Down"; context: Qt.ApplicationShortcut; enabled: window.visible && !searchInput.hasFocus && !window.isScrollingBlocked && !window.isApplying; onActivated: window.stepToNextValidIndex(1, false) }
+    // END user-addon: serpantinum-v2 wallpaper arrow keys
 
 '''
-    text = add_before(text, "        onCurrentIndexChanged: {", key_handler_block, "wallpaper arrow keys")
+    text = add_before(text, '    Shortcut {\n        sequence: "Return"', shortcut_block, "wallpaper arrow keys")
 
     cycle_block = '''    function cycleFilter(direction) {
         let allFilterNames = window.filterData.map(f => f.name);
@@ -390,12 +379,6 @@ import "." as WallpaperRandom
         if replaced != 1:
             raise ApplyError("WallpaperPicker cycleFilter anchor not found")
 
-    text = re.sub(
-        r'^\s*Shortcut \{ sequence: "(?:Left|Right|Up|Down)";.*\}\n',
-        '',
-        text,
-        flags=re.MULTILINE,
-    )
     return text
 
 
