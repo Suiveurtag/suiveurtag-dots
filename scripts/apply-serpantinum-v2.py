@@ -340,11 +340,11 @@ import "." as WallpaperRandom
         r"[ \t]*// END user-addon: serpantinum-v2 wallpaper arrow keys\n(?:\n)*",
         "\n",
         text,
-        count=1,
+        count=0,
         flags=re.DOTALL,
     )
     text = re.sub(
-        r'^\s*Shortcut \{ sequence: "(?:Left|Right|Up|Down)";.*\}\n',
+        r'^[ \t]*Shortcut \{ sequence: "(?:Left|Right|Up|Down)";.*\n',
         '',
         text,
         flags=re.MULTILINE,
@@ -358,6 +358,22 @@ import "." as WallpaperRandom
 
 '''
     text = add_before(text, '    Shortcut {\n        sequence: "Return"', shortcut_block, "wallpaper arrow keys")
+
+    list_key_handler_block = '''        // BEGIN user-addon: serpantinum-v2 wallpaper list arrow keys
+        keyNavigationEnabled: false
+        Keys.priority: Keys.BeforeItem
+        Keys.onPressed: function(event) {
+            let direction = 0;
+            if (event.key === Qt.Key_Left || event.key === Qt.Key_Up) direction = -1;
+            else if (event.key === Qt.Key_Right || event.key === Qt.Key_Down) direction = 1;
+            if (direction === 0 || window.isScrollingBlocked || window.isApplying || searchInput.hasFocus) return;
+            window.stepToNextValidIndex(direction, false);
+            event.accepted = true;
+        }
+        // END user-addon: serpantinum-v2 wallpaper list arrow keys
+
+'''
+    text = add_before(text, "        onCurrentIndexChanged: {", list_key_handler_block, "wallpaper list arrow keys")
 
     cycle_block = '''    function cycleFilter(direction) {
         let allFilterNames = window.filterData.map(f => f.name);
