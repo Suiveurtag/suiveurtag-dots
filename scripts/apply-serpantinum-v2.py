@@ -314,54 +314,71 @@ import "." as WallpaperRandom
         )
 
     navigation_block = '''    function stepToNextValidIndex(direction, shouldApply) {
-        if (displayModel.count === 0) return;
+        if (displayModel.count === 0 || window.isScrollingBlocked || window.isApplying) return;
         window.initialFocusSet = true;
 
         let currentIdx = (view.currentIndex >= 0 && view.currentIndex < displayModel.count)
             ? view.currentIndex
             : (direction > 0 ? -1 : displayModel.count);
         let nextIdx = (currentIdx + direction + displayModel.count) % displayModel.count;
-        if (nextIdx >= 0 && nextIdx < displayModel.count) {
-            view.currentIndex = nextIdx;
-        }
+        view.currentIndex = nextIdx;
+        view.forceActiveFocus();
     }
 
 '''
-    if "function stepToNextValidIndex(direction, shouldApply)" not in text:
-        navigation_pattern = re.compile(
-            r"    function stepToNextValidIndex\(direction\) \{\n.*?^    \}\n",
-            re.DOTALL | re.MULTILINE,
-        )
-        text, replaced = navigation_pattern.subn(navigation_block, text, count=1)
-        if replaced != 1:
-            raise ApplyError("WallpaperPicker arrow navigation anchor not found")
+    navigation_pattern = re.compile(
+        r"    function stepToNextValidIndex\(direction(?:, shouldApply)?\) \{\n.*?^    \}\n",
+        re.DOTALL | re.MULTILINE,
+    )
+    text, replaced = navigation_pattern.subn(navigation_block, text, count=1)
+    if replaced != 1:
+        raise ApplyError("WallpaperPicker arrow navigation anchor not found")
 
+    text = re.sub(
+        r"\n[ \t]*// BEGIN user-addon: serpantinum-v2 wallpaper arrow keys\n"
+        r".*?"
+        r"[ \t]*// END user-addon: serpantinum-v2 wallpaper arrow keys\n",
+        "\n",
+        text,
+        count=1,
+        flags=re.DOTALL,
+    )
     key_handler_block = '''        // BEGIN user-addon: serpantinum-v2 wallpaper arrow keys
         Keys.priority: Keys.BeforeItem
-        Keys.onShortcutOverride: function(event) {
-            if (event.key === Qt.Key_Left || event.key === Qt.Key_Right) {
-                event.accepted = true;
-            }
+        Keys.onLeftPressed: function(event) {
+            if (window.isScrollingBlocked || window.isApplying || searchInput.hasFocus) return;
+            window.stepToNextValidIndex(-1, false);
+            event.accepted = true;
         }
-        Keys.onPressed: function(event) {
-            if (event.key === Qt.Key_Left || event.key === Qt.Key_Right) {
-                event.accepted = true;
-                window.stepToNextValidIndex(event.key === Qt.Key_Left ? -1 : 1, false);
-            }
+        Keys.onRightPressed: function(event) {
+            if (window.isScrollingBlocked || window.isApplying || searchInput.hasFocus) return;
+            window.stepToNextValidIndex(1, false);
+            event.accepted = true;
+        }
+        Keys.onUpPressed: function(event) {
+            if (window.isScrollingBlocked || window.isApplying || searchInput.hasFocus) return;
+            window.stepToNextValidIndex(-1, false);
+            event.accepted = true;
+        }
+        Keys.onDownPressed: function(event) {
+            if (window.isScrollingBlocked || window.isApplying || searchInput.hasFocus) return;
+            window.stepToNextValidIndex(1, false);
+            event.accepted = true;
         }
         // END user-addon: serpantinum-v2 wallpaper arrow keys
 
 '''
-    if "BEGIN user-addon: serpantinum-v2 wallpaper arrow keys" not in text:
-        text = add_before(text, "        onCurrentIndexChanged: {", key_handler_block, "wallpaper arrow keys")
+    text = add_before(text, "        onCurrentIndexChanged: {", key_handler_block, "wallpaper arrow keys")
 
     cycle_block = '''    function cycleFilter(direction) {
-        let allFilterNames = ["All", "History", "Video", "Red", "Orange", "Yellow", "Green", "Blue", "Purple", "Pink", "Monochrome", "Search"];
+        let allFilterNames = window.filterData.map(f => f.name);
+        if (allFilterNames.indexOf("Search") === -1) allFilterNames.push("Search");
+        if (allFilterNames.length === 0) return;
+
         let currentIdx = allFilterNames.indexOf(window.currentFilter);
-        if (currentIdx !== -1) {
-            let nextIdx = (currentIdx + direction + allFilterNames.length) % allFilterNames.length;
-            window.setFilter(allFilterNames[nextIdx]);
-        }
+        if (currentIdx === -1) currentIdx = 0;
+        let nextIdx = (currentIdx + direction + allFilterNames.length) % allFilterNames.length;
+        window.setFilter(allFilterNames[nextIdx]);
     }
 '''
     if "Keep the keyboard cycle deterministic" not in text:
@@ -373,25 +390,12 @@ import "." as WallpaperRandom
         if replaced != 1:
             raise ApplyError("WallpaperPicker cycleFilter anchor not found")
 
-    text = text.replace(
-        'Shortcut { sequence: "Left"; enabled: window.visible && !searchInput.hasFocus && !window.isScrollingBlocked && !window.isApplying; onActivated: window.stepToNextValidIndex(-1) }',
+    text = re.sub(
+        r'^\s*Shortcut \{ sequence: "(?:Left|Right|Up|Down)";.*\}\n',
         '',
-        1,
+        text,
+        flags=re.MULTILINE,
     )
-    text = text.replace(
-        'Shortcut { sequence: "Right"; enabled: window.visible && !searchInput.hasFocus && !window.isScrollingBlocked && !window.isApplying; onActivated: window.stepToNextValidIndex(1) }',
-        '',
-        1,
-    )
-    if 'Shortcut { sequence: "Up"; context: Qt.ApplicationShortcut' not in text:
-        tab_anchor = '    Shortcut { sequence: "Tab"; enabled: window.visible && !window.isApplying; onActivated: window.cycleFilter(1) }'
-        text = text.replace(
-            tab_anchor,
-            '    Shortcut { sequence: "Up"; context: Qt.ApplicationShortcut; enabled: window.visible; onActivated: window.stepToNextValidIndex(-1, false) }\n'
-            '    Shortcut { sequence: "Down"; context: Qt.ApplicationShortcut; enabled: window.visible; onActivated: window.stepToNextValidIndex(1, false) }\n'
-            + tab_anchor,
-            1,
-        )
     return text
 
 
