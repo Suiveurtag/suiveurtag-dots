@@ -263,6 +263,16 @@ import "." as WallpaperRandom
         import_block,
         "BEGIN user-addon: wallpaper-random import",
     )
+    text = text.replace("Item {\n    id: window", "FocusScope {\n    id: window", 1)
+    root_key_handler_block = '''    // BEGIN user-addon: serpantinum-v2 wallpaper root arrow keys
+    Keys.priority: Keys.BeforeItem
+    Keys.onPressed: function(event) {
+        if (window.handleArrowKey(event.key)) event.accepted = true;
+    }
+    // END user-addon: serpantinum-v2 wallpaper root arrow keys
+
+'''
+    text = add_before(text, "    function s(val) {", root_key_handler_block, "wallpaper root arrow keys")
     function_block = '''    // BEGIN user-addon: serpantinum-v2 random wallpaper
     function applyRandomWallpaper() {
         let modelRef = window.activeModel;
@@ -349,31 +359,30 @@ import "." as WallpaperRandom
         text,
         flags=re.MULTILINE,
     )
-    shortcut_block = '''    // BEGIN user-addon: serpantinum-v2 wallpaper arrow keys
-    Shortcut { sequence: "Left"; context: Qt.ApplicationShortcut; enabled: window.visible && !searchInput.hasFocus && !window.isScrollingBlocked && !window.isApplying; onActivated: window.stepToNextValidIndex(-1, false) }
-    Shortcut { sequence: "Right"; context: Qt.ApplicationShortcut; enabled: window.visible && !searchInput.hasFocus && !window.isScrollingBlocked && !window.isApplying; onActivated: window.stepToNextValidIndex(1, false) }
-    Shortcut { sequence: "Up"; context: Qt.ApplicationShortcut; enabled: window.visible && !searchInput.hasFocus && !window.isScrollingBlocked && !window.isApplying; onActivated: window.stepToNextValidIndex(-1, false) }
-    Shortcut { sequence: "Down"; context: Qt.ApplicationShortcut; enabled: window.visible && !searchInput.hasFocus && !window.isScrollingBlocked && !window.isApplying; onActivated: window.stepToNextValidIndex(1, false) }
-    // END user-addon: serpantinum-v2 wallpaper arrow keys
-
-'''
-    text = add_before(text, '    Shortcut {\n        sequence: "Return"', shortcut_block, "wallpaper arrow keys")
-
     list_key_handler_block = '''        // BEGIN user-addon: serpantinum-v2 wallpaper list arrow keys
         keyNavigationEnabled: false
         Keys.priority: Keys.BeforeItem
         Keys.onPressed: function(event) {
-            let direction = 0;
-            if (event.key === Qt.Key_Left || event.key === Qt.Key_Up) direction = -1;
-            else if (event.key === Qt.Key_Right || event.key === Qt.Key_Down) direction = 1;
-            if (direction === 0 || window.isScrollingBlocked || window.isApplying || searchInput.hasFocus) return;
-            window.stepToNextValidIndex(direction, false);
-            event.accepted = true;
+            if (window.handleArrowKey(event.key)) event.accepted = true;
         }
         // END user-addon: serpantinum-v2 wallpaper list arrow keys
 
-'''
+    '''
     text = add_before(text, "        onCurrentIndexChanged: {", list_key_handler_block, "wallpaper list arrow keys")
+
+    arrow_function_block = '''    // BEGIN user-addon: serpantinum-v2 wallpaper arrow function
+    function handleArrowKey(key) {
+        let direction = 0;
+        if (key === Qt.Key_Left || key === Qt.Key_Up) direction = -1;
+        else if (key === Qt.Key_Right || key === Qt.Key_Down) direction = 1;
+        if (direction === 0 || displayModel.count === 0 || window.isScrollingBlocked || window.isApplying || searchInput.hasFocus) return false;
+        window.stepToNextValidIndex(direction, false);
+        return true;
+    }
+    // END user-addon: serpantinum-v2 wallpaper arrow function
+
+'''
+    text = add_before(text, "    function cycleFilter(direction) {", arrow_function_block, "wallpaper arrow function")
 
     cycle_block = '''    function cycleFilter(direction) {
         let allFilterNames = window.filterData.map(f => f.name);
@@ -483,12 +492,14 @@ hl.bind(mainMod .. " + ALT + Z", hl.dsp.exec_cmd("~/.local/share/quickshell-addo
 hl.bind(mainMod .. " + ALT + D", hl.dsp.exec_cmd("~/.local/share/quickshell-addons/zoomit/zoomit.py draw-toggle"))
 hl.bind(mainMod .. " + SHIFT + P", hl.dsp.exec_cmd("serpantinum msg toggle legacysettings"))
 hl.bind("SUPER + TAB", hl.dsp.exec_cmd("~/.local/bin/cycle-mouse-monitor"))
+hl.bind("SUPER + SHIFT + F", hl.dsp.window.float({ action = "toggle" }))
 hl.bind("SUPER + SPACE", hl.dsp.exec_cmd("hyprctl switchxkblayout all next"), { locked = true })
 hl.bind("SUPER + P", hl.dsp.exec_cmd("serpantinum msg toggle guide"))
 -- END user-addon: serpantinum-v2 keybinds
 '''
     required_bindings = (
         'hl.bind("SUPER + TAB", hl.dsp.exec_cmd("~/.local/bin/cycle-mouse-monitor"))',
+        'hl.bind("SUPER + SHIFT + F", hl.dsp.window.float({ action = "toggle" }))',
         'hl.bind("SUPER + SPACE", hl.dsp.exec_cmd("hyprctl switchxkblayout all next"), { locked = true })',
     )
 
@@ -502,6 +513,10 @@ hl.bind("SUPER + P", hl.dsp.exec_cmd("serpantinum msg toggle guide"))
         text = text.replace(marker_end, line + "\n" + marker_end, 1)
 
     if "BEGIN user-addon: serpantinum-v2 keybinds" in text:
+        text = text.replace(
+            'hl.bind("SUPER + SHIFT + F", hl.dsp.exec_cmd("hyprctl dispatch togglefloating"))\n',
+            '',
+        )
         text = text.replace(
             'hl.bind(mainMod .. " + SHIFT + H", hl.dsp.exec_cmd("serpantinum ipc call legacysettings toggle"))',
             'hl.bind(mainMod .. " + SHIFT + H", hl.dsp.exec_cmd("serpantinum msg toggle legacysettings"))',
