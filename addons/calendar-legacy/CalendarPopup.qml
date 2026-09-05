@@ -56,6 +56,7 @@ Item {
     // -------------------------------------------------------------------------
     Shortcut { 
         sequence: "Left"
+        enabled: typeof masterWindow !== "undefined" && masterWindow.currentActive === "calendar"
         onActivated: {
             if (calHover.hovered) {
                 window.setMonthOffset(window.targetMonthOffset - 1);
@@ -67,6 +68,7 @@ Item {
 
     Shortcut { 
         sequence: "Right"
+        enabled: typeof masterWindow !== "undefined" && masterWindow.currentActive === "calendar"
         onActivated: {
             if (calHover.hovered) {
                 window.setMonthOffset(window.targetMonthOffset + 1);
